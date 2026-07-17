@@ -1,0 +1,118 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-studio}
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["miniodata:/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: { context: ., dockerfile: services/api/Dockerfile }
+    env_file: .env
+    ports: ["8000:8000"]
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    volumes:
+      - ./services/api/app:/srv/app
+      - ./services/api/alembic:/srv/alembic
+      - ./services/common:/srv/common
+
+  worker-download:
+    build: { context: ., dockerfile: services/workers/Dockerfile }
+    env_file: .env
+    command: celery -A workers.celery_app worker -Q download -c 8 -P threads --loglevel=INFO
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    volumes:
+      - ./services/workers:/srv/workers
+      - ./services/common:/srv/common
+
+  worker-separate:
+    build: { context: ., dockerfile: services/workers/Dockerfile.separate }
+    env_file: .env
+    command: celery -A workers.celery_app worker -Q separate_priority,separate -c 1 -P solo --loglevel=INFO
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    volumes:
+      - ./services/workers:/srv/workers
+      - ./services/common:/srv/common
+      - demucs-models:/root/.cache/torch
+
+  worker-dsp:
+    build: { context: ., dockerfile: services/workers/Dockerfile }
+    env_file: .env
+    command: celery -A workers.celery_app worker -Q dsp -c 4 -P prefork --loglevel=INFO
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    volumes:
+      - ./services/workers:/srv/workers
+      - ./services/common:/srv/common
+
+  beat:
+    build: { context: ., dockerfile: services/workers/Dockerfile }
+    env_file: .env
+    command: celery -A workers.celery_app beat --loglevel=INFO
+    depends_on:
+      redis: { condition: service_healthy }
+    volumes:
+      - ./services/workers:/srv/workers
+      - ./services/common:/srv/common
+
+  web:
+    build: { context: ./apps/web }
+    env_file: .env
+    environment:
+      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8000}
+    ports: ["3000:3000"]
+    depends_on: [api]
+    volumes:
+      - ./apps/web:/srv/app
+      - web-node-modules:/srv/app/node_modules
+      - web-next:/srv/app/.next
+
+volumes:
+  pgdata:
+  miniodata:
+  demucs-models:
+  web-node-modules:
+  web-next:

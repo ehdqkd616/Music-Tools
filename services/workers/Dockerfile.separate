@@ -1,0 +1,26 @@
+# Separation worker — Demucs on CPU (no CUDA available on this dev host).
+# `workers.tasks` imports every task module at Celery startup, so this image
+# still needs the base worker deps (yt-dlp, librosa, ...) plus torch/demucs.
+FROM python:3.11-slim
+
+WORKDIR /srv
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY services/workers/requirements.txt ./requirements.txt
+COPY services/workers/requirements-separate.txt ./requirements-separate.txt
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-separate.txt
+
+COPY services/common ./common
+COPY services/workers ./workers
+
+ENV PYTHONPATH=/srv PYTHONUNBUFFERED=1 DEMUCS_DEVICE=cpu
+
+# Preload the fast-tier model at build time so the first job doesn't stall on a
+# download. htdemucs_ft (HQ/pro tier) is left to lazy-load on first use — it's
+# a much bigger download and most local dev iterations only need `fast`.
+RUN python -c "from demucs.pretrained import get_model; get_model('htdemucs')"
+
+CMD ["celery", "-A", "workers.celery_app", "worker", "-Q", "separate_priority,separate", "-c", "1", "-P", "solo", "--loglevel=INFO"]
