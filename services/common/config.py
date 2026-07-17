@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     max_youtube_duration_sec: int = 1200
     anon_daily_download_limit: int = 10
     anon_daily_separate_limit: int = 2
+    media_ttl_hours: int = 24
 
     proxy_url: str = ""
     cookie_path: str = ""

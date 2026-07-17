@@ -10,11 +10,18 @@ from common.db.models import Job
 from common.db.session import session_scope
 from common.ffprobe import probe
 from common.storage import upload_file
-from common.ytdlp import CLIENT_FALLBACK_CHAIN
+from common.ytdlp import CLIENT_FALLBACK_CHAIN, classify_youtube_error, is_permanent_error
 
 from ..celery_app import app
 from ..download.ytdlp_config import audio_opts, video_opts
-from ..job_lifecycle import BACKOFF_SEC, mark_failed, mark_running, mark_succeeded, register_media
+from ..job_lifecycle import (
+    BACKOFF_SEC,
+    mark_failed,
+    mark_progress,
+    mark_running,
+    mark_succeeded,
+    register_media,
+)
 
 MIME_TYPES = {"mp3": "audio/mpeg", "wav": "audio/wav", "m4a": "audio/mp4", "mp4": "video/mp4"}
 
@@ -26,6 +33,7 @@ def extract_youtube(self, job_id: str) -> dict:
         params = dict(job.params)
 
     mark_running(job_id)
+    mark_progress(job_id, 1, "downloading")  # immediate feedback — the client fallback loop below can take a while
     url, video_id = params["url"], params["video_id"]
     kind, format_id = params["kind"], params["format_id"]
 
@@ -41,6 +49,11 @@ def extract_youtube(self, job_id: str) -> dict:
                 break
             except DownloadError as exc:  # §5.1.3 — try next client in the chain
                 last_error = exc
+                if is_permanent_error(str(exc)):
+                    # DRM/unavailable/private is a property of the video, not the
+                    # client — every other client would fail the same way, so
+                    # don't waste time (and re-download bytes) trying them.
+                    break
                 continue
         if info is None:
             raise last_error or RuntimeError("yt-dlp extraction failed for all clients")
@@ -83,7 +96,8 @@ def extract_youtube(self, job_id: str) -> dict:
         return {"media_id": media_id}
 
     except Exception as exc:
-        retryable = mark_failed(job_id, "EXTRACTION_FAILED", str(exc))
+        code = classify_youtube_error(str(exc))
+        retryable = mark_failed(job_id, code, str(exc))
         if retryable:
             attempt = self.request.retries
             raise self.retry(exc=exc, countdown=BACKOFF_SEC[min(attempt, len(BACKOFF_SEC) - 1)])

@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import FormatPicker from "@/components/FormatPicker";
 import JobProgress from "@/components/JobProgress";
 import UrlInput from "@/components/UrlInput";
-import { api, ApiError } from "@/lib/api-client";
+import { api, ApiError, triggerDownload } from "@/lib/api-client";
 import type { YoutubeInfoResponse } from "@/lib/types";
 
 type Mode = "idle" | "downloading" | "importing";
@@ -86,8 +86,9 @@ export default function Home() {
   async function onDownloadComplete(outputs: string[]) {
     setJobId(null);
     if (outputs[0]) {
-      const media = await api.mediaUrl(outputs[0]);
+      const media = await api.downloadUrl(outputs[0]);
       setDownloadUrl(media.url);
+      await triggerDownload(outputs[0]); // 바로 저장되도록 — 아래 링크는 실패했을 때를 위한 대비
     }
     setMode("idle");
   }

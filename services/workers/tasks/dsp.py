@@ -6,7 +6,7 @@ import numpy as np
 import soundfile as sf
 
 from common.audio_convert import encode, ensure_wav
-from common.cache import L3_TTL, cache_get, cache_set, content_hash, l3_key
+from common.cache import L3_TTL, L4_TTL, cache_get, cache_set, content_hash, l3_key, pitch_key, tempo_key
 from common.db.models import Analysis, Job, Media
 from common.db.session import session_scope
 from common.ffprobe import probe
@@ -30,7 +30,17 @@ def _load_job(job_id: str) -> tuple[dict, Media]:
 @app.task(name="tasks.pitch_shift_stems", bind=True, max_retries=1)
 def pitch_shift_stems(self, job_id: str) -> dict:
     params, media = _load_job(job_id)
+    semitones = float(params["semitones"])
+    stem_type = params.get("stem_type", "other")
+
     mark_running(job_id)
+
+    cache_key = pitch_key(media.content_hash, semitones, stem_type)
+    cached = cache_get(cache_key)
+    if cached and cached.get("media_id"):
+        mark_succeeded(job_id, [cached["media_id"]], cache_hit=True)
+        return cached
+
     work_dir = tempfile.mkdtemp(prefix="pitch_")
     try:
         local_src = os.path.join(work_dir, f"source.{media.mime_type.split('/')[-1]}")
@@ -38,8 +48,6 @@ def pitch_shift_stems(self, job_id: str) -> dict:
         wav_src = ensure_wav(local_src)
 
         mark_progress(job_id, 30, "pitch_shifting")
-        semitones = float(params["semitones"])
-        stem_type = params.get("stem_type", "other")
         out_path = os.path.join(work_dir, "out.wav")
         pitch_shift(wav_src, out_path, semitones, stem_type)
 
@@ -59,13 +67,17 @@ def pitch_shift_stems(self, job_id: str) -> dict:
             duration_sec=meta["duration_sec"],
             sample_rate=meta["sample_rate"],
             channels=meta["channels"],
+            title=media.title,
+            artist=media.artist,
             lineage={
                 "op": "pitch",
                 "semitones": semitones,
+                "stem_type": stem_type,
                 "formant": stem_type == "vocals",
                 "engine": "rubberband-r3",
             },
         )
+        cache_set(cache_key, {"media_id": media_id}, L4_TTL)
         mark_succeeded(job_id, [media_id])
         return {"media_id": media_id}
     except Exception as exc:
@@ -78,7 +90,16 @@ def pitch_shift_stems(self, job_id: str) -> dict:
 @app.task(name="tasks.time_stretch_stems", bind=True, max_retries=1)
 def time_stretch_stems(self, job_id: str) -> dict:
     params, media = _load_job(job_id)
+    ratio = float(params["ratio"])
+
     mark_running(job_id)
+
+    cache_key = tempo_key(media.content_hash, ratio)
+    cached = cache_get(cache_key)
+    if cached and cached.get("media_id"):
+        mark_succeeded(job_id, [cached["media_id"]], cache_hit=True)
+        return cached
+
     work_dir = tempfile.mkdtemp(prefix="tempo_")
     try:
         local_src = os.path.join(work_dir, f"source.{media.mime_type.split('/')[-1]}")
@@ -86,7 +107,6 @@ def time_stretch_stems(self, job_id: str) -> dict:
         wav_src = ensure_wav(local_src)
 
         mark_progress(job_id, 30, "time_stretching")
-        ratio = float(params["ratio"])
         out_path = os.path.join(work_dir, "out.wav")
         time_stretch(wav_src, out_path, ratio)
 
@@ -106,8 +126,11 @@ def time_stretch_stems(self, job_id: str) -> dict:
             duration_sec=meta["duration_sec"],
             sample_rate=meta["sample_rate"],
             channels=meta["channels"],
+            title=media.title,
+            artist=media.artist,
             lineage={"op": "tempo", "ratio": ratio, "engine": "rubberband-r3"},
         )
+        cache_set(cache_key, {"media_id": media_id}, L4_TTL)
         mark_succeeded(job_id, [media_id])
         return {"media_id": media_id}
     except Exception as exc:
@@ -174,7 +197,14 @@ def mix_stems(self, job_id: str) -> dict:
             duration_sec=meta["duration_sec"],
             sample_rate=meta["sample_rate"],
             channels=meta["channels"],
-            lineage={"op": "mix", "sources": params["media_ids"], "output_format": output_format},
+            title=media_snapshots[0].title,
+            artist=media_snapshots[0].artist,
+            lineage={
+                "op": "mix",
+                "sources": params["media_ids"],
+                "output_format": output_format,
+                "semitones": params.get("semitones"),
+            },
         )
         mark_succeeded(job_id, [media_id])
         return {"media_id": media_id}

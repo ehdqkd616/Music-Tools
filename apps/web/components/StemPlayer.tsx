@@ -6,17 +6,20 @@ export interface Stem {
   name: string;
   label: string;
   url: string;
+  mediaId: string;
 }
 
 interface Props {
   stems: Stem[];
+  onDownload: (stem: Stem) => void;
+  downloadingName?: string | null;
 }
 
 // Each stem gets its own WaveSurfer instance. wavesurfer.js v7 has no public
 // option to share a single AudioContext across instances, so sync instead
 // follows the master track's `audioprocess` event and snaps any stem that
 // has drifted more than 50ms (§10.2's intent, adapted to the actual API).
-export default function StemPlayer({ stems }: Props) {
+export default function StemPlayer({ stems, onDownload, downloadingName }: Props) {
   const containerRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const wsRefs = useRef<Record<string, any>>({});
   const [playing, setPlaying] = useState(false);
@@ -24,6 +27,8 @@ export default function StemPlayer({ stems }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    setReady(false);
+    setPlaying(false);
 
     (async () => {
       const { default: WaveSurfer } = await import("wavesurfer.js");
@@ -92,6 +97,14 @@ export default function StemPlayer({ stems }: Props) {
             onChange={(e) => setVolume(stem.name, parseFloat(e.target.value))}
             className="w-20"
           />
+          <button
+            onClick={() => onDownload(stem)}
+            disabled={downloadingName === stem.name}
+            title={`${stem.label} 다운로드`}
+            className="rounded-md border border-white/10 hover:border-white/30 px-2 py-1 text-xs disabled:opacity-40"
+          >
+            {downloadingName === stem.name ? "…" : "⬇"}
+          </button>
         </div>
       ))}
 

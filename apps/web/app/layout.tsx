@@ -15,6 +15,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Studio
           </a>
           <nav className="text-sm text-white/60 flex gap-4">
+            <a href="/library" className="hover:text-white">
+              내 작업
+            </a>
             <a href="/dmca" className="hover:text-white">
               DMCA
             </a>

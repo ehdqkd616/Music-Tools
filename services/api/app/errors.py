@@ -11,6 +11,7 @@ ERROR_TABLE: dict[str, tuple[int, bool]] = {
     "AGE_RESTRICTED": (403, False),
     "GEO_BLOCKED": (403, False),
     "LIVE_STREAM_UNSUPPORTED": (400, False),
+    "DRM_PROTECTED": (403, False),
     "EXTRACTION_FAILED": (502, True),
     "RATE_LIMITED": (429, True),
     "QUEUE_FULL": (503, True),

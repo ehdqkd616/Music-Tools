@@ -9,6 +9,13 @@ AUDIO_CODECS = {
     "wav": ("wav", None),
 }
 
+# yt-dlp's EmbedThumbnail postprocessor only supports these containers ("Supported
+# filetypes for thumbnail embedding are: mp3, mkv/mka, ogg/opus/flac, m4a/mp4/m4v/mov").
+# wav isn't one of them — forcing it there raised a postprocessing error that yt-dlp
+# then confusingly re-reported as "This video is DRM protected", which looked like a
+# YouTube-side block but was entirely our own postprocessor misconfiguration.
+THUMBNAIL_EMBEDDABLE_CODECS = {"mp3", "m4a", "flac", "opus", "ogg"}
+
 VIDEO_HEIGHTS = {
     "mp4-1080": 1080,
     "mp4-720": 720,
@@ -35,16 +42,17 @@ def audio_opts(job_id: str, format_id: str, out_dir: str, player_client: str | N
     if quality:
         postprocessor["preferredquality"] = quality
 
+    postprocessors = [postprocessor, {"key": "FFmpegMetadata", "add_metadata": True}]
+    embed_thumbnail = codec in THUMBNAIL_EMBEDDABLE_CODECS
+    if embed_thumbnail:
+        postprocessors.append({"key": "EmbedThumbnail"})
+
     opts = base_opts(player_client)
     opts.update(
         {
             "format": "bestaudio/best",
-            "postprocessors": [
-                postprocessor,
-                {"key": "FFmpegMetadata", "add_metadata": True},
-                {"key": "EmbedThumbnail"},
-            ],
-            "writethumbnail": True,
+            "postprocessors": postprocessors,
+            "writethumbnail": embed_thumbnail,
             "outtmpl": f"{out_dir}/%(id)s.%(ext)s",
             "progress_hooks": [make_progress_hook(job_id)],
         }

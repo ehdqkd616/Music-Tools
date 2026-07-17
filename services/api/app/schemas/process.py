@@ -21,6 +21,7 @@ class TempoRequest(BaseModel):
 class MixRequest(BaseModel):
     media_ids: list[str]
     output_format: str = "mp3-320"
+    semitones: float | None = None  # 표시용 — 실제 믹스에 반영되진 않고 다운로드 파일명에만 쓰임
 
 
 class AnalyzeResponse(BaseModel):

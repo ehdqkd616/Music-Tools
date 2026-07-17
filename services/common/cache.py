@@ -10,6 +10,7 @@ from .redis_client import get_redis
 L1_TTL = 60 * 60 * 24  # 24h — youtube download cache
 L2_TTL = 60 * 60 * 24 * 7  # 7d — separation result cache
 L3_TTL = 60 * 60 * 24 * 30  # 30d — key/BPM/loudness analysis cache
+L4_TTL = 60 * 60 * 24 * 7  # 7d — pitch/tempo result cache
 
 
 def content_hash(path: str) -> str:
@@ -36,6 +37,14 @@ def l2_key(content_hash_: str, model: str, stems: int) -> str:
 
 def l3_key(content_hash_: str) -> str:
     return f"analysis:{content_hash_}"
+
+
+def pitch_key(content_hash_: str, semitones: float, stem_type: str) -> str:
+    return f"pitch:{content_hash_}:{semitones}:{stem_type}"
+
+
+def tempo_key(content_hash_: str, ratio: float) -> str:
+    return f"tempo:{content_hash_}:{ratio}"
 
 
 def cache_get(key: str) -> dict | None:

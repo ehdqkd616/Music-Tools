@@ -1,11 +1,23 @@
 from datetime import timedelta
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote
 
 import boto3
 from botocore.client import Config
 
 from .config import get_settings
+
+
+def _content_disposition(filename: str) -> str:
+    """RFC 6266: a bare `filename="..."` is only well-defined for ASCII — putting
+    raw UTF-8 (e.g. Korean) in it is exactly what produced mojibake filenames on
+    save. `filename*=UTF-8''<percent-encoded>` is the actual standard for
+    non-ASCII names; the ASCII `filename=` stays as a fallback for clients that
+    don't understand the extended form."""
+    ascii_fallback = filename.encode("ascii", errors="ignore").decode("ascii").strip() or "download"
+    encoded = quote(filename, safe="")
+    return f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded}'
 
 
 @lru_cache
@@ -71,10 +83,21 @@ def object_exists(key: str) -> bool:
         return False
 
 
-def presigned_get_url(key: str, expires: timedelta = timedelta(hours=1)) -> str:
+def presigned_get_url(
+    key: str,
+    expires: timedelta = timedelta(hours=1),
+    download_filename: str | None = None,
+) -> str:
+    """`download_filename` sets response-content-disposition so the browser saves
+    the file instead of opening an inline player — S3 (and MinIO) support this as
+    a per-request override on GetObject, so no proxying through our own API is
+    needed just to force a download."""
     settings = get_settings()
+    params = {"Bucket": settings.s3_bucket, "Key": key}
+    if download_filename:
+        params["ResponseContentDisposition"] = _content_disposition(download_filename)
     return _public_client().generate_presigned_url(
         "get_object",
-        Params={"Bucket": settings.s3_bucket, "Key": key},
+        Params=params,
         ExpiresIn=int(expires.total_seconds()),
     )

@@ -2,11 +2,10 @@
 
 from datetime import datetime, timedelta, timezone
 
+from .config import get_settings
 from .db.models import Media
 from .db.session import session_scope
 from .ids import new_id
-
-MEDIA_TTL = timedelta(hours=24)
 
 
 def register_media(
@@ -28,6 +27,7 @@ def register_media(
     lineage: dict | None = None,
 ) -> str:
     media_id = media_id or new_id("med")
+    ttl = timedelta(hours=get_settings().media_ttl_hours)
     with session_scope() as db:
         media = Media(
             id=media_id,
@@ -45,7 +45,7 @@ def register_media(
             title=title,
             artist=artist,
             lineage=lineage or {},
-            expires_at=datetime.now(timezone.utc) + MEDIA_TTL,
+            expires_at=datetime.now(timezone.utc) + ttl,
         )
         db.merge(media)
     return media_id

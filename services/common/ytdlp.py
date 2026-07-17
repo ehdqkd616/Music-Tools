@@ -32,6 +32,37 @@ def base_opts(player_client: str | None = None) -> dict:
     return opts
 
 
+# Content-level failures — retrying (same or different client) can never
+# succeed, so the per-client fallback loop and the outer Celery retry should
+# both give up immediately instead of burning ~20-40s of backoff first.
+PERMANENT_ERROR_PATTERNS = {
+    "DRM_PROTECTED": ("drm protected",),
+    "VIDEO_UNAVAILABLE": ("video unavailable", "video has been removed", "private video"),
+    "AGE_RESTRICTED": ("sign in to confirm your age", "age-restricted", "age restricted"),
+    "GEO_BLOCKED": ("not available in your country", "not available on this app"),
+    "LIVE_STREAM_UNSUPPORTED": ("this live event",),
+}
+
+
+def classify_youtube_error(message: str) -> str:
+    """Maps a yt-dlp error message to a §7.2 error code.
+
+    Anything not matched here (network blips, bot-detection blocks, format
+    hiccups on one client) falls back to EXTRACTION_FAILED, which IS
+    retryable — only clearly permanent, content-level failures get a
+    non-retryable code.
+    """
+    lower = message.lower()
+    for code, patterns in PERMANENT_ERROR_PATTERNS.items():
+        if any(p in lower for p in patterns):
+            return code
+    return "EXTRACTION_FAILED"
+
+
+def is_permanent_error(message: str) -> bool:
+    return classify_youtube_error(message) != "EXTRACTION_FAILED"
+
+
 def fetch_info(url: str) -> dict:
     """Metadata-only lookup (download=False), trying each client in the fallback chain."""
     from yt_dlp import DownloadError, YoutubeDL

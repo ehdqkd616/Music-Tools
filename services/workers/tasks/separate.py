@@ -26,6 +26,8 @@ def separate_stems(self, job_id: str) -> dict:
         media = db.get(Media, params["media_id"])
         source_hash = media.content_hash
         storage_key = media.storage_key
+        source_title = media.title
+        source_artist = media.artist
 
     stems = int(params.get("stems", 2))
     quality = params.get("quality", "fast")
@@ -65,6 +67,8 @@ def separate_stems(self, job_id: str) -> dict:
                 storage_key=stem_key,
                 mime_type="audio/wav",
                 size_bytes=os.path.getsize(local_out),
+                title=source_title,
+                artist=source_artist,
                 lineage={"op": "separate", "model": model_name, "stem": stem_name, "stems": stems},
             )
             output_ids[stem_name] = media_id

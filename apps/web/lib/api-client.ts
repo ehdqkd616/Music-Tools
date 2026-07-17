@@ -3,6 +3,7 @@ import type {
   ApiErrorBody,
   JobCreatedResponse,
   JobStatusResponse,
+  LibraryItem,
   MediaUrlResponse,
   UploadResponse,
   YoutubeInfoResponse,
@@ -71,10 +72,10 @@ export const api = {
       body: JSON.stringify({ media_id, semitones, stem_type }),
     }),
 
-  mix: (media_ids: string[], output_format: string = "mp3-320") =>
+  mix: (media_ids: string[], output_format: string = "mp3-320", semitones?: number) =>
     request<JobCreatedResponse>("/api/v1/process/mix", {
       method: "POST",
-      body: JSON.stringify({ media_ids, output_format }),
+      body: JSON.stringify({ media_ids, output_format, semitones }),
     }),
 
   analyze: (media_id: string) => request<AnalyzeResponse>(`/api/v1/analyze/${media_id}`),
@@ -84,6 +85,26 @@ export const api = {
   jobEventsUrl: (job_id: string) => `${API_BASE}/api/v1/jobs/${job_id}/events`,
 
   mediaUrl: (media_id: string) => request<MediaUrlResponse>(`/api/v1/media/${media_id}/url`),
+
+  // Presigned URL with response-content-disposition=attachment — the browser
+  // saves the file instead of opening an inline player (unlike mediaUrl above,
+  // which stays undecorated so <audio>/WaveSurfer can stream it normally).
+  downloadUrl: (media_id: string) => request<MediaUrlResponse>(`/api/v1/media/${media_id}/download`),
+
+  library: () => request<LibraryItem[]>("/api/v1/library"),
+
+  deleteMedia: (media_id: string) =>
+    request<{ deleted: string; cascaded: number }>(`/api/v1/media/${media_id}`, { method: "DELETE" }),
 };
+
+export async function triggerDownload(media_id: string) {
+  const { url } = await api.downloadUrl(media_id);
+  const a = document.createElement("a");
+  a.href = url;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
 
 export { ApiError };

@@ -54,7 +54,17 @@ async def job_events(job_id: str) -> StreamingResponse:
                 job = db.get(Job, job_id)
                 if job and job.status in ("succeeded", "failed"):
                     event = "complete" if job.status == "succeeded" else "error"
-                    yield f"event: {event}\ndata: {json.dumps({'status': job.status, 'outputs': job.output_media or []})}\n\n"
+                    # Must match the live pub/sub shape from job_lifecycle.mark_succeeded
+                    # ({"media_id": m} objects) — JobProgress.tsx reads o.media_id off each
+                    # entry, so a bare string here silently produced `outputs: [undefined]`.
+                    payload = {
+                        "status": job.status,
+                        "outputs": [{"media_id": m} for m in (job.output_media or [])],
+                    }
+                    if job.status == "failed":
+                        payload["code"] = job.error_code
+                        payload["message"] = job.error_message
+                    yield f"event: {event}\ndata: {json.dumps(payload)}\n\n"
                     return
             finally:
                 db.close()

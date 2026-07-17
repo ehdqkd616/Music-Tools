@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from common.cache import cache_get, l2_key
+from common.cache import cache_get, l2_key, pitch_key, tempo_key
 from common.celery_client import send_task
 from common.config import get_settings
 from common.db.models import Media
@@ -60,7 +60,19 @@ def process_separate(body: SeparateRequest) -> JobCreatedResponse:
 def process_pitch(body: PitchRequest) -> JobCreatedResponse:
     db = SessionLocal()
     try:
-        _get_media(db, body.media_id)
+        media = _get_media(db, body.media_id)
+
+        cache_key = pitch_key(media.content_hash, body.semitones, body.stem_type)
+        cached = cache_get(cache_key)
+        if cached and cached.get("media_id"):
+            job = create_job(db, "pitch", body.media_id, body.model_dump())
+            job.status = "succeeded"
+            job.output_media = [cached["media_id"]]
+            job.cache_hit = True
+            job.progress = 100
+            db.commit()
+            return JobCreatedResponse(job_id=job.id, status="succeeded", cached=True)
+
         job = create_job(db, "pitch", body.media_id, body.model_dump())
     finally:
         db.close()
@@ -75,7 +87,19 @@ def process_pitch(body: PitchRequest) -> JobCreatedResponse:
 def process_tempo(body: TempoRequest) -> JobCreatedResponse:
     db = SessionLocal()
     try:
-        _get_media(db, body.media_id)
+        media = _get_media(db, body.media_id)
+
+        cache_key = tempo_key(media.content_hash, body.ratio)
+        cached = cache_get(cache_key)
+        if cached and cached.get("media_id"):
+            job = create_job(db, "tempo", body.media_id, body.model_dump())
+            job.status = "succeeded"
+            job.output_media = [cached["media_id"]]
+            job.cache_hit = True
+            job.progress = 100
+            db.commit()
+            return JobCreatedResponse(job_id=job.id, status="succeeded", cached=True)
+
         job = create_job(db, "tempo", body.media_id, body.model_dump())
     finally:
         db.close()

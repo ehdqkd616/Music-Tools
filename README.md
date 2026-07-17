@@ -36,6 +36,12 @@ docker compose up --build
 
 `api` 컨테이너는 시작할 때 `alembic upgrade head`를 자동 실행해 DB 스키마를 만듭니다.
 
+### GUI로 관리하기 (Windows)
+
+터미널 명령이 번거로우면 저장소 루트의 **`Studio 서버 관리.vbs`** 를 더블클릭하세요. 버튼으로
+전체/개별 서비스 시작·중지·재시작을 하고, 실시간 로그도 같은 창에서 볼 수 있습니다. 자세한 내용은
+[`tools/server-manager/README.md`](tools/server-manager/README.md) 참고.
+
 ## 모노레포 구조
 
 ```
@@ -43,6 +49,7 @@ apps/web/                Next.js 15 프론트엔드
 services/api/             FastAPI (라우터 · 스키마 · alembic 마이그레이션)
 services/workers/         Celery 워커 (download / separation / dsp)
 services/common/          api·workers가 공유하는 DB 모델, 캐시, 스토리지, yt-dlp 설정 등
+tools/server-manager/     서버 시작/중지/로그 확인용 Windows GUI
 ```
 
 `services/common`은 두 이미지(`services/api/Dockerfile`, `services/workers/Dockerfile*`)에

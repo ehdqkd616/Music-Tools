@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api-client";
+import { translateError } from "@/lib/errors";
 
 interface Props {
   jobId: string;
@@ -48,7 +49,7 @@ export default function JobProgress({ jobId, onComplete, onError }: Props) {
       doneRef.current = true;
       const data = (e as MessageEvent).data ? JSON.parse((e as MessageEvent).data) : {};
       source.close();
-      onError?.(data.message ?? "작업이 실패했습니다.");
+      onError?.(translateError(data.code, data.message));
     });
 
     return () => source.close();

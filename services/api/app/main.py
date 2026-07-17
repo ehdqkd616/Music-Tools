@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from common.config import get_settings
 from common.storage import ensure_bucket
 from .errors import ApiError, api_error_handler
-from .routers import analyze, jobs, media, process, upload, youtube
+from .routers import analyze, jobs, library, media, process, upload, youtube
 
 settings = get_settings()
 
@@ -26,6 +26,7 @@ app.include_router(process.router, prefix="/api/v1/process", tags=["process"])
 app.include_router(analyze.router, prefix="/api/v1/analyze", tags=["analyze"])
 app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["jobs"])
 app.include_router(media.router, prefix="/api/v1/media", tags=["media"])
+app.include_router(library.router, prefix="/api/v1/library", tags=["library"])
 
 
 @app.on_event("startup")

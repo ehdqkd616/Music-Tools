@@ -68,3 +68,15 @@ export interface MediaUrlResponse {
 export interface ApiErrorBody {
   error: { code: string; message: string; detail: Record<string, unknown>; retryable: boolean };
 }
+
+export interface LibraryItem {
+  media_id: string;
+  title: string | null;
+  artist: string | null;
+  source_type: string;
+  yt_video_id: string | null;
+  thumbnail: string | null;
+  duration_sec: number | null;
+  has_stems: boolean;
+  created_at: string;
+}

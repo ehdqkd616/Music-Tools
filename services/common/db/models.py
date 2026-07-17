@@ -84,7 +84,7 @@ class Job(Base):
     )
     type: Mapped[str] = mapped_column(Text, nullable=False)  # extract|separate|pitch|tempo|mix
     status: Mapped[str] = mapped_column(Text, nullable=False, default="queued")
-    input_media: Mapped[str | None] = mapped_column(Text, ForeignKey("media.id"))
+    input_media: Mapped[str | None] = mapped_column(Text, ForeignKey("media.id", ondelete="SET NULL"))
     params: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     output_media: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     progress: Mapped[float] = mapped_column(REAL, default=0)
