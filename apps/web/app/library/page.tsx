@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, triggerDownload } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 import type { LibraryItem } from "@/lib/types";
 
 function formatDuration(sec: number | null): string {
@@ -14,17 +15,19 @@ function formatDuration(sec: number | null): string {
 
 export default function LibraryPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [items, setItems] = useState<LibraryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     api
       .library()
       .then(setItems)
       .catch(() => setError("작업 기록을 불러오지 못했습니다."));
-  }, []);
+  }, [authLoading, user]);
 
   async function handleDownload(id: string) {
     setDownloadingId(id);
@@ -50,6 +53,23 @@ export default function LibraryPage() {
     } finally {
       setDeletingId(null);
     }
+  }
+
+  if (authLoading) return <p className="text-sm text-white/50">불러오는 중…</p>;
+
+  if (!user) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-lg font-semibold">내 작업</h1>
+        <p className="text-sm text-white/50">로그인하면 처리한 곡을 계정별로 모아볼 수 있어요.</p>
+        <a
+          href="/login"
+          className="inline-block rounded-md bg-accent text-ink font-medium px-4 py-2 text-sm"
+        >
+          로그인
+        </a>
+      </div>
+    );
   }
 
   return (

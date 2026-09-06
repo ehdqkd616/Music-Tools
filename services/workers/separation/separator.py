@@ -1,8 +1,8 @@
 """§5.2.1 vocal/instrumental separation.
 
-Runs on CPU in this stack — the dev host has an AMD GPU, so there's no CUDA
-device available to PyTorch/Demucs here. `DEMUCS_DEVICE` stays configurable
-for anyone running this on an NVIDIA box.
+Runs on CUDA in this stack (NVIDIA GPU host). `DEMUCS_DEVICE` stays
+configurable via .env for anyone running this on a CPU-only or AMD box
+(set it back to "cpu" and swap requirements-separate.txt's wheel index).
 
 torch/torchaudio/demucs are imported lazily inside each function, not at
 module level. `workers/tasks/__init__.py` imports every task module — including

@@ -4,10 +4,10 @@ from sqlalchemy.orm import Session
 from common.cache import cache_get, l2_key, pitch_key, tempo_key
 from common.celery_client import send_task
 from common.config import get_settings
-from common.db.models import Media
+from common.db.models import Media, User
 from common.db.session import SessionLocal
 
-from ..deps import enforce_separate_quota
+from ..deps import enforce_separate_quota, require_user
 from ..errors import ApiError
 from ..job_utils import ETA_SEC, create_job, queue_position
 from ..schemas.jobs import JobCreatedResponse
@@ -24,10 +24,11 @@ def _get_media(db: Session, media_id: str) -> Media:
 
 
 @router.post("/separate", response_model=JobCreatedResponse, dependencies=[Depends(enforce_separate_quota)])
-def process_separate(body: SeparateRequest) -> JobCreatedResponse:
+def process_separate(body: SeparateRequest, current_user: User = Depends(require_user)) -> JobCreatedResponse:
     if body.stems != 2:
         raise ApiError("VALIDATION_ERROR", "MVP는 2스템(보컬/반주) 분리만 지원합니다.", {"stems": body.stems})
 
+    user_id = current_user.id
     settings = get_settings()
     db = SessionLocal()
     try:
@@ -36,7 +37,7 @@ def process_separate(body: SeparateRequest) -> JobCreatedResponse:
 
         cached = cache_get(l2_key(media.content_hash, model_name, body.stems))
         if cached:
-            job = create_job(db, "separate", body.media_id, body.model_dump())
+            job = create_job(db, "separate", body.media_id, body.model_dump(), user_id=user_id)
             job.status = "succeeded"
             job.output_media = [v for v in cached.values() if v]
             job.cache_hit = True
@@ -44,7 +45,7 @@ def process_separate(body: SeparateRequest) -> JobCreatedResponse:
             db.commit()
             return JobCreatedResponse(job_id=job.id, status="succeeded", cached=True)
 
-        job = create_job(db, "separate", body.media_id, body.model_dump())
+        job = create_job(db, "separate", body.media_id, body.model_dump(), user_id=user_id)
     finally:
         db.close()
 
@@ -57,15 +58,16 @@ def process_separate(body: SeparateRequest) -> JobCreatedResponse:
 
 
 @router.post("/pitch", response_model=JobCreatedResponse)
-def process_pitch(body: PitchRequest) -> JobCreatedResponse:
+def process_pitch(body: PitchRequest, current_user: User = Depends(require_user)) -> JobCreatedResponse:
+    user_id = current_user.id
     db = SessionLocal()
     try:
         media = _get_media(db, body.media_id)
 
-        cache_key = pitch_key(media.content_hash, body.semitones, body.stem_type)
+        cache_key = pitch_key(media.content_hash, body.semitones, body.stem_type, body.preview)
         cached = cache_get(cache_key)
         if cached and cached.get("media_id"):
-            job = create_job(db, "pitch", body.media_id, body.model_dump())
+            job = create_job(db, "pitch", body.media_id, body.model_dump(), user_id=user_id)
             job.status = "succeeded"
             job.output_media = [cached["media_id"]]
             job.cache_hit = True
@@ -73,7 +75,7 @@ def process_pitch(body: PitchRequest) -> JobCreatedResponse:
             db.commit()
             return JobCreatedResponse(job_id=job.id, status="succeeded", cached=True)
 
-        job = create_job(db, "pitch", body.media_id, body.model_dump())
+        job = create_job(db, "pitch", body.media_id, body.model_dump(), user_id=user_id)
     finally:
         db.close()
 
@@ -84,7 +86,8 @@ def process_pitch(body: PitchRequest) -> JobCreatedResponse:
 
 
 @router.post("/tempo", response_model=JobCreatedResponse)
-def process_tempo(body: TempoRequest) -> JobCreatedResponse:
+def process_tempo(body: TempoRequest, current_user: User = Depends(require_user)) -> JobCreatedResponse:
+    user_id = current_user.id
     db = SessionLocal()
     try:
         media = _get_media(db, body.media_id)
@@ -92,7 +95,7 @@ def process_tempo(body: TempoRequest) -> JobCreatedResponse:
         cache_key = tempo_key(media.content_hash, body.ratio)
         cached = cache_get(cache_key)
         if cached and cached.get("media_id"):
-            job = create_job(db, "tempo", body.media_id, body.model_dump())
+            job = create_job(db, "tempo", body.media_id, body.model_dump(), user_id=user_id)
             job.status = "succeeded"
             job.output_media = [cached["media_id"]]
             job.cache_hit = True
@@ -100,7 +103,7 @@ def process_tempo(body: TempoRequest) -> JobCreatedResponse:
             db.commit()
             return JobCreatedResponse(job_id=job.id, status="succeeded", cached=True)
 
-        job = create_job(db, "tempo", body.media_id, body.model_dump())
+        job = create_job(db, "tempo", body.media_id, body.model_dump(), user_id=user_id)
     finally:
         db.close()
 
@@ -111,12 +114,12 @@ def process_tempo(body: TempoRequest) -> JobCreatedResponse:
 
 
 @router.post("/mix", response_model=JobCreatedResponse)
-def process_mix(body: MixRequest) -> JobCreatedResponse:
+def process_mix(body: MixRequest, current_user: User = Depends(require_user)) -> JobCreatedResponse:
     db = SessionLocal()
     try:
         for media_id in body.media_ids:
             _get_media(db, media_id)
-        job = create_job(db, "mix", body.media_ids[0], body.model_dump())
+        job = create_job(db, "mix", body.media_ids[0], body.model_dump(), user_id=current_user.id)
     finally:
         db.close()
 

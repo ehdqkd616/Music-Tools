@@ -21,6 +21,11 @@ ERROR_TABLE: dict[str, tuple[int, bool]] = {
     "FILE_TOO_LARGE": (400, False),
     "UNSUPPORTED_FORMAT": (400, False),
     "VALIDATION_ERROR": (400, False),
+    "EMAIL_TAKEN": (409, False),
+    "INVALID_CREDENTIALS": (401, False),
+    "NOT_AUTHENTICATED": (401, False),
+    "PENDING_APPROVAL": (403, False),
+    "FORBIDDEN": (403, False),
 }
 
 

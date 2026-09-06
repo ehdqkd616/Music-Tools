@@ -11,6 +11,7 @@ class PitchRequest(BaseModel):
     media_id: str
     semitones: float = Field(ge=-12, le=12)
     stem_type: str = "other"  # vocals | drums | bass | other — selects Rubber Band mode
+    preview: bool = False  # True = R2/fast engine for a quick listen; False = R3/fine for export
 
 
 class TempoRequest(BaseModel):

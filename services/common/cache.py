@@ -39,8 +39,11 @@ def l3_key(content_hash_: str) -> str:
     return f"analysis:{content_hash_}"
 
 
-def pitch_key(content_hash_: str, semitones: float, stem_type: str) -> str:
-    return f"pitch:{content_hash_}:{semitones}:{stem_type}"
+def pitch_key(content_hash_: str, semitones: float, stem_type: str, preview: bool = False) -> str:
+    # preview (R2/fast) and final (R3/fine) runs produce different quality output
+    # for the same semitones, so they can't share a cache slot.
+    tier = "preview" if preview else "final"
+    return f"pitch:{content_hash_}:{semitones}:{stem_type}:{tier}"
 
 
 def tempo_key(content_hash_: str, ratio: float) -> str:

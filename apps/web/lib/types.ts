@@ -69,6 +69,19 @@ export interface ApiErrorBody {
   error: { code: string; message: string; detail: Record<string, unknown>; retryable: boolean };
 }
 
+export interface User {
+  id: string;
+  email: string;
+  tier: string;
+  is_approved: boolean;
+  is_admin: boolean;
+  created_at: string;
+}
+
+export interface MeResponse {
+  user: User | null;
+}
+
 export interface LibraryItem {
   media_id: string;
   title: string | null;

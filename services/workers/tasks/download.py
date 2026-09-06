@@ -31,6 +31,7 @@ def extract_youtube(self, job_id: str) -> dict:
     with session_scope() as db:
         job = db.get(Job, job_id)
         params = dict(job.params)
+        user_id = job.user_id
 
     mark_running(job_id)
     mark_progress(job_id, 1, "downloading")  # immediate feedback — the client fallback loop below can take a while
@@ -89,6 +90,7 @@ def extract_youtube(self, job_id: str) -> dict:
             title=info.get("title"),
             artist=info.get("channel") or info.get("uploader"),
             lineage={"op": "youtube_extract", "kind": kind, "format_id": format_id},
+            user_id=user_id,
         )
 
         cache_set(l1_key(video_id, kind, format_id), {"media_id": media_id, "job_id": job_id}, L1_TTL)

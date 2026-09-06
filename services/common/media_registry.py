@@ -1,5 +1,6 @@
 """Shared `media` table writer — used by both the API (uploads) and workers (§8)."""
 
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from .config import get_settings
@@ -25,12 +26,14 @@ def register_media(
     title: str | None = None,
     artist: str | None = None,
     lineage: dict | None = None,
+    user_id: uuid.UUID | None = None,
 ) -> str:
     media_id = media_id or new_id("med")
     ttl = timedelta(hours=get_settings().media_ttl_hours)
     with session_scope() as db:
         media = Media(
             id=media_id,
+            user_id=user_id,
             kind=kind,
             source_type=source_type,
             parent_id=parent_id,

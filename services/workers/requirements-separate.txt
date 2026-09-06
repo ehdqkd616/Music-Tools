@@ -1,6 +1,6 @@
-# CPU-only PyTorch wheels — this stack has no CUDA device (AMD GPU host).
-# Swap this index for the CUDA one if you ever run these workers on an NVIDIA box.
---extra-index-url https://download.pytorch.org/whl/cpu
+# CUDA PyTorch wheels — this host has an NVIDIA GPU (GTX 1050 Ti, driver >= 525).
+# Swap this index back to /whl/cpu if you ever run these workers on a host with no CUDA device.
+--extra-index-url https://download.pytorch.org/whl/cu121
 torch==2.4.1
 torchaudio==2.4.1
 demucs==4.0.1

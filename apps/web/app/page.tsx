@@ -6,12 +6,14 @@ import FormatPicker from "@/components/FormatPicker";
 import JobProgress from "@/components/JobProgress";
 import UrlInput from "@/components/UrlInput";
 import { api, ApiError, triggerDownload } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 import type { YoutubeInfoResponse } from "@/lib/types";
 
 type Mode = "idle" | "downloading" | "importing";
 
 export default function Home() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [info, setInfo] = useState<YoutubeInfoResponse | null>(null);
@@ -98,6 +100,30 @@ export default function Home() {
     if (outputs[0]) router.push(`/studio/${outputs[0]}`);
   }
 
+  if (authLoading) return <p className="text-sm text-white/50">불러오는 중…</p>;
+
+  if (!user) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-semibold">로그인이 필요합니다</h1>
+        <p className="text-sm text-white/50">
+          유튜브 추출, 파일 업로드, 보컬/MR 분리, 키·템포 조절은 로그인한 계정만 이용할 수 있어요.
+        </p>
+        <div className="flex gap-2">
+          <a href="/login" className="rounded-md bg-accent text-ink font-medium px-4 py-2 text-sm">
+            로그인
+          </a>
+          <a
+            href="/signup"
+            className="rounded-md bg-white/10 hover:bg-white/20 px-4 py-2 text-sm"
+          >
+            회원가입
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <section className="space-y-3">
@@ -114,7 +140,7 @@ export default function Home() {
           onClick={() => fileInputRef.current?.click()}
           className="rounded-lg border border-dashed border-white/20 px-4 py-6 text-center text-sm text-white/50 cursor-pointer hover:border-white/40"
         >
-          {uploading ? "업로드 중…" : "또는 MP3/WAV/M4A/FLAC 파일을 여기로 드래그 (최대 100MB / 15분)"}
+          {uploading ? "업로드 중…" : "또는 MP3/WAV/M4A/FLAC 파일을 여기로 드래그 (최대 1GB / 1시간)"}
           <input
             ref={fileInputRef}
             type="file"

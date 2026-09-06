@@ -2,12 +2,13 @@ from fastapi import APIRouter, Depends, Request
 
 from common.cache import cache_get, cache_set, l1_key, L1_TTL
 from common.celery_client import send_task
+from common.db.models import User
 from common.redis_client import get_redis
 from common.youtube_url import extract_video_id, normalize_youtube_url
 from common.ytdlp import fetch_info
 from common.config import get_settings
 
-from ..deps import enforce_download_quota
+from ..deps import enforce_download_quota, require_user
 from ..errors import ApiError
 from ..job_utils import ETA_SEC, create_job, queue_position
 from ..schemas.jobs import JobCreatedResponse
@@ -29,7 +30,7 @@ VIDEO_QUALITIES = [
 _VIDEO_MB_PER_SEC = {1080: 0.28, 720: 0.14, 360: 0.05}
 
 
-@router.post("/info", response_model=YoutubeInfoResponse)
+@router.post("/info", response_model=YoutubeInfoResponse, dependencies=[Depends(require_user)])
 def get_info(body: YoutubeInfoRequest) -> YoutubeInfoResponse:
     settings = get_settings()
     normalized = normalize_youtube_url(body.url)
@@ -79,7 +80,9 @@ def get_info(body: YoutubeInfoRequest) -> YoutubeInfoResponse:
 
 
 @router.post("/extract", response_model=JobCreatedResponse, dependencies=[Depends(enforce_download_quota)])
-def extract(body: YoutubeExtractRequest, request: Request) -> JobCreatedResponse:
+def extract(
+    body: YoutubeExtractRequest, request: Request, current_user: User = Depends(require_user)
+) -> JobCreatedResponse:
     from sqlalchemy.orm import Session
 
     from common.db.session import SessionLocal
@@ -108,6 +111,7 @@ def extract(body: YoutubeExtractRequest, request: Request) -> JobCreatedResponse
             "extract",
             None,
             {"url": normalized, "video_id": video_id, "kind": body.kind, "format_id": body.format_id},
+            user_id=current_user.id,
         )
     finally:
         db.close()

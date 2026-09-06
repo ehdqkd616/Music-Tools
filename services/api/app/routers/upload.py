@@ -2,14 +2,16 @@ import os
 import tempfile
 
 import magic
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, Depends, UploadFile
 
 from common.cache import content_hash
 from common.config import get_settings
+from common.db.models import User
 from common.ffprobe import ProbeError, probe
 from common.media_registry import register_media
 from common.storage import object_exists, upload_file
 
+from ..deps import require_user
 from ..errors import ApiError
 from ..schemas.media import UploadResponse
 
@@ -28,7 +30,7 @@ ALLOWED_MIME_EXT = {
 
 
 @router.post("", response_model=UploadResponse)
-async def upload(file: UploadFile) -> UploadResponse:
+async def upload(file: UploadFile, current_user: User = Depends(require_user)) -> UploadResponse:
     settings = get_settings()
     max_bytes = settings.max_upload_mb * 1024 * 1024
 
@@ -89,6 +91,7 @@ async def upload(file: UploadFile) -> UploadResponse:
             channels=meta["channels"],
             title=title,
             lineage={"op": "upload"},
+            user_id=current_user.id,
         )
 
         return UploadResponse(

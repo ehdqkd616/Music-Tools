@@ -1,5 +1,8 @@
-# Separation worker — Demucs on CPU (no CUDA available on this dev host).
-# `workers.tasks` imports every task module at Celery startup, so this image
+# Separation worker — Demucs on CUDA (NVIDIA GPU host; needs nvidia-container-toolkit
+# on the Docker host and a `deploy.resources.reservations.devices` GPU reservation on
+# this service in docker-compose.yml). The CUDA runtime itself ships inside the
+# torch/cu121 wheel below, so a plain Python base image is enough — no CUDA base image
+# needed. `workers.tasks` imports every task module at Celery startup, so this image
 # still needs the base worker deps (yt-dlp, librosa, ...) plus torch/demucs.
 FROM python:3.11-slim
 
@@ -16,7 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt -r requirements-separate.txt
 COPY services/common ./common
 COPY services/workers ./workers
 
-ENV PYTHONPATH=/srv PYTHONUNBUFFERED=1 DEMUCS_DEVICE=cpu
+ENV PYTHONPATH=/srv PYTHONUNBUFFERED=1
+# DEMUCS_DEVICE is set via .env / docker-compose env_file at runtime, not baked in here.
 
 # Preload the fast-tier model at build time so the first job doesn't stall on a
 # download. htdemucs_ft (HQ/pro tier) is left to lazy-load on first use — it's

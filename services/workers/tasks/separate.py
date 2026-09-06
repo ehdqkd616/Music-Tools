@@ -23,6 +23,7 @@ def separate_stems(self, job_id: str) -> dict:
 
         job = db.get(Job, job_id)
         params = dict(job.params)
+        user_id = job.user_id
         media = db.get(Media, params["media_id"])
         source_hash = media.content_hash
         storage_key = media.storage_key
@@ -70,6 +71,7 @@ def separate_stems(self, job_id: str) -> dict:
                 title=source_title,
                 artist=source_artist,
                 lineage={"op": "separate", "model": model_name, "stem": stem_name, "stems": stems},
+                user_id=user_id,
             )
             output_ids[stem_name] = media_id
 

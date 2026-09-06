@@ -1,27 +1,27 @@
-"""§로컬 전용 확장: 처리했던 곡 기록.
+"""내 작업(라이브러리) — 로그인한 사용자 본인의 source 미디어만 반환한다."""
 
-인증이 없는 개인용 인스턴스라 별도 user_id 필터 없이 전체 source 미디어를
-반환한다 — 외부에 노출하지 않는 로컬 도구라는 전제하에서만 안전한 단순화다.
-"""
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 
-from common.db.models import Media
+from common.db.models import Media, User
 from common.db.session import SessionLocal
 
+from ..deps import require_user
 from ..schemas.media import LibraryItem
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[LibraryItem])
-def list_library(limit: int = 200) -> list[LibraryItem]:
+def list_library(limit: int = 200, current_user: User = Depends(require_user)) -> list[LibraryItem]:
     db = SessionLocal()
     try:
         sources = (
             db.execute(
-                select(Media).where(Media.kind == "source").order_by(Media.created_at.desc()).limit(limit)
+                select(Media)
+                .where(Media.kind == "source", Media.user_id == current_user.id)
+                .order_by(Media.created_at.desc())
+                .limit(limit)
             )
             .scalars()
             .all()

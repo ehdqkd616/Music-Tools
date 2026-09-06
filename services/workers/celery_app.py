@@ -1,8 +1,9 @@
 """§9.2 Celery queue routing.
 
-Separation runs on CPU in this local stack (no CUDA available — AMD GPU host),
-but we keep the `-P solo` worker pool anyway: it processes one Demucs job at a
-time in-process, which keeps memory bounded on a dev machine.
+Separation runs on CUDA in this local stack (NVIDIA GPU host). The `-P solo`
+worker pool still processes one Demucs job at a time in-process — the GPU
+itself is the bottleneck resource, so there's no benefit to more concurrency
+here, and it keeps memory bounded on a dev machine.
 """
 
 from celery import Celery

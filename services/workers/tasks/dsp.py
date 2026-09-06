@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import uuid
 
 import numpy as np
 import soundfile as sf
@@ -18,24 +19,26 @@ from ..dsp.pitch import pitch_shift, time_stretch
 from ..job_lifecycle import mark_failed, mark_progress, mark_running, mark_succeeded, register_media
 
 
-def _load_job(job_id: str) -> tuple[dict, Media]:
+def _load_job(job_id: str) -> tuple[dict, Media, uuid.UUID | None]:
     with session_scope() as db:
         job = db.get(Job, job_id)
         params = dict(job.params)
+        user_id = job.user_id
         media = db.get(Media, params["media_id"])
         media_snapshot = Media(**{c.name: getattr(media, c.name) for c in Media.__table__.columns})
-    return params, media_snapshot
+    return params, media_snapshot, user_id
 
 
 @app.task(name="tasks.pitch_shift_stems", bind=True, max_retries=1)
 def pitch_shift_stems(self, job_id: str) -> dict:
-    params, media = _load_job(job_id)
+    params, media, user_id = _load_job(job_id)
     semitones = float(params["semitones"])
     stem_type = params.get("stem_type", "other")
+    preview = bool(params.get("preview", False))
 
     mark_running(job_id)
 
-    cache_key = pitch_key(media.content_hash, semitones, stem_type)
+    cache_key = pitch_key(media.content_hash, semitones, stem_type, preview)
     cached = cache_get(cache_key)
     if cached and cached.get("media_id"):
         mark_succeeded(job_id, [cached["media_id"]], cache_hit=True)
@@ -49,7 +52,7 @@ def pitch_shift_stems(self, job_id: str) -> dict:
 
         mark_progress(job_id, 30, "pitch_shifting")
         out_path = os.path.join(work_dir, "out.wav")
-        pitch_shift(wav_src, out_path, semitones, stem_type)
+        pitch_shift(wav_src, out_path, semitones, stem_type, fast=preview)
 
         meta = probe(out_path)
         out_hash = content_hash(out_path)
@@ -74,8 +77,9 @@ def pitch_shift_stems(self, job_id: str) -> dict:
                 "semitones": semitones,
                 "stem_type": stem_type,
                 "formant": stem_type == "vocals",
-                "engine": "rubberband-r3",
+                "engine": "rubberband-r2" if preview else "rubberband-r3",
             },
+            user_id=user_id,
         )
         cache_set(cache_key, {"media_id": media_id}, L4_TTL)
         mark_succeeded(job_id, [media_id])
@@ -89,7 +93,7 @@ def pitch_shift_stems(self, job_id: str) -> dict:
 
 @app.task(name="tasks.time_stretch_stems", bind=True, max_retries=1)
 def time_stretch_stems(self, job_id: str) -> dict:
-    params, media = _load_job(job_id)
+    params, media, user_id = _load_job(job_id)
     ratio = float(params["ratio"])
 
     mark_running(job_id)
@@ -129,6 +133,7 @@ def time_stretch_stems(self, job_id: str) -> dict:
             title=media.title,
             artist=media.artist,
             lineage={"op": "tempo", "ratio": ratio, "engine": "rubberband-r3"},
+            user_id=user_id,
         )
         cache_set(cache_key, {"media_id": media_id}, L4_TTL)
         mark_succeeded(job_id, [media_id])
@@ -145,6 +150,7 @@ def mix_stems(self, job_id: str) -> dict:
     with session_scope() as db:
         job = db.get(Job, job_id)
         params = dict(job.params)
+        user_id = job.user_id
         media_rows = [db.get(Media, mid) for mid in params["media_ids"]]
         media_snapshots = [
             Media(**{c.name: getattr(m, c.name) for c in Media.__table__.columns}) for m in media_rows
@@ -205,6 +211,7 @@ def mix_stems(self, job_id: str) -> dict:
                 "output_format": output_format,
                 "semitones": params.get("semitones"),
             },
+            user_id=user_id,
         )
         mark_succeeded(job_id, [media_id])
         return {"media_id": media_id}

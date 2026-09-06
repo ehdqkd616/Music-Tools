@@ -5,13 +5,15 @@
 
 ## 이 환경에서 달라진 점
 
-설계서는 GPU(CUDA) 서버 배포를 전제로 하지만, 이 저장소는 **로컬 개발 환경(Windows + Docker
-Desktop + AMD GPU)** 기준으로 조정되어 있습니다.
+설계서는 GPU(CUDA) 서버 배포를 전제로 하며, 이 저장소는 **로컬 개발 환경(Linux + Docker +
+NVIDIA GPU)** 기준으로 조정되어 있습니다.
 
-- **분리 워커는 CPU로 동작합니다.** AMD GPU는 PyTorch/Demucs의 CUDA 경로를 쓸 수 없어서입니다.
-  4분 곡 분리에 GPU 대비 훨씬 오래 걸립니다(수 분 단위 예상). 엔비디아 GPU가 있는 머신에서는
-  `.env`의 `DEMUCS_DEVICE=cuda`로 바꾸고 `services/workers/Dockerfile.separate`의 베이스 이미지를
-  CUDA 지원 PyTorch 이미지로 교체하면 됩니다.
+- **분리 워커는 CUDA(NVIDIA GPU)로 동작합니다.** 호스트에 NVIDIA 드라이버와
+  `nvidia-container-toolkit`이 설치되어 있어야 하고, `docker-compose.yml`의
+  `worker-separate` 서비스에 GPU 리소스 예약(`deploy.resources.reservations.devices`)이
+  걸려 있습니다. CUDA 장비가 없는 머신에서 돌리려면 `.env`의 `DEMUCS_DEVICE=cpu`로 바꾸고
+  `services/workers/requirements-separate.txt`의 wheel 인덱스를 `/whl/cpu`로 되돌리세요
+  (4분 곡 분리에 GPU 대비 훨씬 오래 걸립니다, 수 분 단위 예상).
 - **레지덴셜 프록시가 없습니다.** 유튜브 봇 탐지(§5.1.3)에 취약합니다 — 다운로드가 간헐적으로
   실패할 수 있습니다. `.env`의 `PROXY_URL`에 프록시를 넣으면 사용됩니다.
 - **인증/회원 기능은 없습니다.** 설계서상 Phase 2 항목이라 제외했습니다. 사용량 제한은 IP 해시

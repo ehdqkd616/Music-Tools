@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     demucs_fast_model: str = "htdemucs"
     demucs_hq_model: str = "htdemucs_ft"
 
+    # Bootstrapped as an approved admin user on API startup if set and not already present.
+    admin_email: str = ""
+    admin_password: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

@@ -5,6 +5,7 @@ import JobProgress from "@/components/JobProgress";
 import KeyControl from "@/components/KeyControl";
 import StemPlayer, { Stem } from "@/components/StemPlayer";
 import { api, ApiError, triggerDownload } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 import { waitForJob } from "@/lib/jobs";
 import type { AnalyzeResponse } from "@/lib/types";
 
@@ -12,6 +13,7 @@ type Stage = "separating" | "ready" | "previewing" | "exporting";
 
 export default function StudioPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: sourceId } = use(params);
+  const { user, loading: authLoading } = useAuth();
 
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
   const [stage, setStage] = useState<Stage>("separating");
@@ -25,8 +27,13 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
 
   const [semitones, setSemitones] = useState(0);
   const [previewSemitones, setPreviewSemitones] = useState<number | null>(null);
-  const [previewVocalsId, setPreviewVocalsId] = useState<string | null>(null);
-  const [previewInstrumentalId, setPreviewInstrumentalId] = useState<string | null>(null);
+
+  // 미리듣기(R2/fast)와는 별개로 최종 내보내기(R3/fine) 결과를 캐시해둔다 — 품질이
+  // 달라서 미리듣기 결과를 내보내기에 재사용할 수 없으니, 같은 반음으로 내보내기를
+  // 두 번 누르는 경우를 위한 캐시가 따로 필요하다.
+  const [finalSemitones, setFinalSemitones] = useState<number | null>(null);
+  const [finalVocalsId, setFinalVocalsId] = useState<string | null>(null);
+  const [finalInstrumentalId, setFinalInstrumentalId] = useState<string | null>(null);
 
   const [stems, setStems] = useState<Stem[]>([]);
   const [downloadingStem, setDownloadingStem] = useState<string | null>(null);
@@ -34,10 +41,12 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
 
   // 분석은 몇 초면 끝나니 분리와 병렬로 먼저 보여준다 (§10.2).
   useEffect(() => {
+    if (authLoading || !user) return;
     api.analyze(sourceId).then(setAnalysis).catch(() => {});
-  }, [sourceId]);
+  }, [authLoading, user, sourceId]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     api
       .separate(sourceId, "fast")
       .then(async (job) => {
@@ -50,7 +59,7 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : "분리를 시작하지 못했습니다."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceId]);
+  }, [authLoading, user, sourceId]);
 
   async function loadStems(vocalsId: string, instrumentalId: string) {
     const [vUrl, iUrl] = await Promise.all([api.mediaUrl(vocalsId), api.mediaUrl(instrumentalId)]);
@@ -76,21 +85,17 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
 
     if (semitones === 0) {
       setPreviewSemitones(0);
-      setPreviewVocalsId(null);
-      setPreviewInstrumentalId(null);
       await loadStems(originalVocalsId, originalInstrumentalId);
       return;
     }
 
     setStage("previewing");
     try {
-      const vJob = await api.pitch(originalVocalsId, semitones, "vocals");
-      const [newVocals] = await waitForJob(vJob.job_id);
-      const iJob = await api.pitch(originalInstrumentalId, semitones, "other");
-      const [newInstrumental] = await waitForJob(iJob.job_id);
+      const [[newVocals], [newInstrumental]] = await Promise.all([
+        api.pitch(originalVocalsId, semitones, "vocals", true).then((job) => waitForJob(job.job_id)),
+        api.pitch(originalInstrumentalId, semitones, "other", true).then((job) => waitForJob(job.job_id)),
+      ]);
 
-      setPreviewVocalsId(newVocals);
-      setPreviewInstrumentalId(newInstrumental);
       setPreviewSemitones(semitones);
       await loadStems(newVocals, newInstrumental);
     } catch (e) {
@@ -112,17 +117,21 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
       if (semitones === 0) {
         finalVocals = originalVocalsId;
         finalInstrumental = originalInstrumentalId;
-      } else if (previewSemitones === semitones && previewVocalsId && previewInstrumentalId) {
-        // 같은 반음으로 이미 미리듣기 해뒀으면 다시 피치하지 않고 그 결과를 그대로 믹스에 재사용.
-        finalVocals = previewVocalsId;
-        finalInstrumental = previewInstrumentalId;
+      } else if (finalSemitones === semitones && finalVocalsId && finalInstrumentalId) {
+        // 같은 반음으로 이미 고품질(R3) 내보내기를 해뒀으면 재사용 — 미리듣기(R2)
+        // 결과는 품질이 달라서 여기 재사용하면 안 된다.
+        finalVocals = finalVocalsId;
+        finalInstrumental = finalInstrumentalId;
       } else {
-        const vJob = await api.pitch(originalVocalsId, semitones, "vocals");
-        const [newVocals] = await waitForJob(vJob.job_id);
-        const iJob = await api.pitch(originalInstrumentalId, semitones, "other");
-        const [newInstrumental] = await waitForJob(iJob.job_id);
+        const [[newVocals], [newInstrumental]] = await Promise.all([
+          api.pitch(originalVocalsId, semitones, "vocals", false).then((job) => waitForJob(job.job_id)),
+          api.pitch(originalInstrumentalId, semitones, "other", false).then((job) => waitForJob(job.job_id)),
+        ]);
         finalVocals = newVocals;
         finalInstrumental = newInstrumental;
+        setFinalSemitones(semitones);
+        setFinalVocalsId(newVocals);
+        setFinalInstrumentalId(newInstrumental);
       }
 
       const mixJob = await api.mix([finalVocals, finalInstrumental], "mp3-320", semitones);
@@ -151,6 +160,19 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
     setError(msg);
     setSeparateJobId(null);
     setStage("ready");
+  }
+
+  if (authLoading) return <p className="text-sm text-white/50">불러오는 중…</p>;
+
+  if (!user) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-lg font-semibold">로그인이 필요합니다</h1>
+        <a href="/login" className="inline-block rounded-md bg-accent text-ink font-medium px-4 py-2 text-sm">
+          로그인
+        </a>
+      </div>
+    );
   }
 
   return (

@@ -5,7 +5,9 @@ import type {
   JobStatusResponse,
   LibraryItem,
   MediaUrlResponse,
+  MeResponse,
   UploadResponse,
+  User,
   YoutubeInfoResponse,
 } from "./types";
 
@@ -27,6 +29,7 @@ class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
+    credentials: "include",
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
   if (!res.ok) {
@@ -52,7 +55,11 @@ export const api = {
   upload: async (file: File): Promise<UploadResponse> => {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${API_BASE}/api/v1/upload`, { method: "POST", body: form });
+    const res = await fetch(`${API_BASE}/api/v1/upload`, {
+      method: "POST",
+      body: form,
+      credentials: "include",
+    });
     if (!res.ok) {
       const body = (await res.json()) as ApiErrorBody;
       throw new ApiError(body.error);
@@ -66,10 +73,10 @@ export const api = {
       body: JSON.stringify({ media_id, stems: 2, quality }),
     }),
 
-  pitch: (media_id: string, semitones: number, stem_type: string = "other") =>
+  pitch: (media_id: string, semitones: number, stem_type: string = "other", preview: boolean = false) =>
     request<JobCreatedResponse>("/api/v1/process/pitch", {
       method: "POST",
-      body: JSON.stringify({ media_id, semitones, stem_type }),
+      body: JSON.stringify({ media_id, semitones, stem_type, preview }),
     }),
 
   mix: (media_ids: string[], output_format: string = "mp3-320", semitones?: number) =>
@@ -90,6 +97,27 @@ export const api = {
   // saves the file instead of opening an inline player (unlike mediaUrl above,
   // which stays undecorated so <audio>/WaveSurfer can stream it normally).
   downloadUrl: (media_id: string) => request<MediaUrlResponse>(`/api/v1/media/${media_id}/download`),
+
+  signup: (email: string, password: string) =>
+    request<User>("/api/v1/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
+
+  login: (email: string, password: string) =>
+    request<User>("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+
+  logout: () => request<{ logged_out: boolean }>("/api/v1/auth/logout", { method: "POST" }),
+
+  me: () => request<MeResponse>("/api/v1/auth/me"),
+
+  adminListUsers: () => request<User[]>("/api/v1/admin/users"),
+
+  adminApprove: (userId: string) =>
+    request<User>(`/api/v1/admin/users/${userId}/approve`, { method: "POST" }),
+
+  adminUnapprove: (userId: string) =>
+    request<User>(`/api/v1/admin/users/${userId}/unapprove`, { method: "POST" }),
+
+  adminDeleteUser: (userId: string) =>
+    request<{ deleted: string }>(`/api/v1/admin/users/${userId}`, { method: "DELETE" }),
 
   library: () => request<LibraryItem[]>("/api/v1/library"),
 

@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy.orm import Session
 
 from common.db.models import Job
@@ -23,8 +25,21 @@ QUEUE_NAME = {
 }
 
 
-def create_job(db: Session, job_type: str, input_media: str | None, params: dict) -> Job:
-    job = Job(id=new_id("job"), type=job_type, status="queued", input_media=input_media, params=params)
+def create_job(
+    db: Session,
+    job_type: str,
+    input_media: str | None,
+    params: dict,
+    user_id: uuid.UUID | None = None,
+) -> Job:
+    job = Job(
+        id=new_id("job"),
+        type=job_type,
+        status="queued",
+        input_media=input_media,
+        params=params,
+        user_id=user_id,
+    )
     db.add(job)
     db.commit()
     db.refresh(job)
