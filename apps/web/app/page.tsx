@@ -109,13 +109,16 @@ export default function Home() {
         <p className="text-sm text-white/50">
           유튜브 추출, 파일 업로드, 보컬/MR 분리, 키·템포 조절은 로그인한 계정만 이용할 수 있어요.
         </p>
-        <div className="flex gap-2">
-          <a href="/login" className="rounded-md bg-accent text-ink font-medium px-4 py-2 text-sm">
+        <div className="flex flex-wrap gap-2">
+          <a
+            href="/login"
+            className="rounded-md bg-accent text-ink font-medium px-4 py-2 text-sm whitespace-nowrap"
+          >
             로그인
           </a>
           <a
             href="/signup"
-            className="rounded-md bg-white/10 hover:bg-white/20 px-4 py-2 text-sm"
+            className="rounded-md bg-white/10 hover:bg-white/20 px-4 py-2 text-sm whitespace-nowrap"
           >
             회원가입
           </a>
@@ -160,11 +163,15 @@ export default function Home() {
           <div className="flex gap-3">
             {info.thumbnail && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={info.thumbnail} alt="" className="w-28 h-16 object-cover rounded-md" />
+              <img
+                src={info.thumbnail}
+                alt=""
+                className="w-28 h-16 object-cover rounded-md shrink-0"
+              />
             )}
-            <div>
-              <p className="font-medium">{info.title}</p>
-              <p className="text-sm text-white/50">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">{info.title}</p>
+              <p className="text-sm text-white/50 truncate">
                 {info.channel} · {Math.floor(info.duration_sec / 60)}:
                 {String(info.duration_sec % 60).padStart(2, "0")}
               </p>
@@ -179,18 +186,18 @@ export default function Home() {
               selected={format}
               onSelect={setFormat}
             />
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
               <button
                 onClick={startDownload}
                 disabled={mode !== "idle"}
-                className="rounded-md bg-white/10 hover:bg-white/20 px-4 py-2 text-sm disabled:opacity-40"
+                className="rounded-md bg-white/10 hover:bg-white/20 px-4 py-2 text-sm whitespace-nowrap disabled:opacity-40"
               >
                 📥 그냥 다운로드
               </button>
               <button
                 onClick={startImport}
                 disabled={mode !== "idle"}
-                className="rounded-md bg-accent text-ink font-medium px-4 py-2 text-sm disabled:opacity-40"
+                className="rounded-md bg-accent text-ink font-medium px-4 py-2 text-sm whitespace-nowrap disabled:opacity-40"
               >
                 🎤 MR 만들기 / 키 바꾸기
               </button>

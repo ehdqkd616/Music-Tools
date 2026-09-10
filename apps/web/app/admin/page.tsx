@@ -97,43 +97,45 @@ export default function AdminPage() {
         {users?.map((u) => (
           <div
             key={u.id}
-            className="flex items-center gap-3 rounded-lg border border-white/10 bg-panel p-3"
+            className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-white/10 bg-panel p-3"
           >
             <div className="flex-1 min-w-0">
               <p className="font-medium truncate">
                 {u.email}
-                {u.is_admin && <span className="ml-2 text-xs text-accent">관리자</span>}
+                {u.is_admin && <span className="ml-2 text-xs text-accent whitespace-nowrap">관리자</span>}
               </p>
-              <p className="text-xs text-white/50">
+              <p className="text-xs text-white/50 truncate">
                 {u.is_approved ? "승인됨" : "승인 대기"} · 가입 {new Date(u.created_at).toLocaleString("ko-KR")}
               </p>
             </div>
 
-            {u.is_approved ? (
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+              {u.is_approved ? (
+                <button
+                  onClick={() => handleUnapprove(u)}
+                  disabled={busyId === u.id}
+                  className="rounded-md border border-white/10 hover:border-white/30 px-3 py-1.5 text-xs whitespace-nowrap disabled:opacity-40"
+                >
+                  {busyId === u.id ? "…" : "승인 취소"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleApprove(u)}
+                  disabled={busyId === u.id}
+                  className="rounded-md bg-accent text-ink font-medium px-3 py-1.5 text-xs whitespace-nowrap disabled:opacity-40"
+                >
+                  {busyId === u.id ? "…" : "승인"}
+                </button>
+              )}
               <button
-                onClick={() => handleUnapprove(u)}
+                onClick={() => handleDelete(u)}
                 disabled={busyId === u.id}
-                className="rounded-md border border-white/10 hover:border-white/30 px-3 py-1.5 text-xs disabled:opacity-40"
+                title="삭제"
+                className="rounded-md border border-white/10 hover:border-red-400 hover:text-red-400 px-2 py-1.5 text-xs whitespace-nowrap disabled:opacity-40"
               >
-                {busyId === u.id ? "…" : "승인 취소"}
+                {busyId === u.id ? "…" : "🗑"}
               </button>
-            ) : (
-              <button
-                onClick={() => handleApprove(u)}
-                disabled={busyId === u.id}
-                className="rounded-md bg-accent text-ink font-medium px-3 py-1.5 text-xs disabled:opacity-40"
-              >
-                {busyId === u.id ? "…" : "승인"}
-              </button>
-            )}
-            <button
-              onClick={() => handleDelete(u)}
-              disabled={busyId === u.id}
-              title="삭제"
-              className="rounded-md border border-white/10 hover:border-red-400 hover:text-red-400 px-2 py-1.5 text-xs disabled:opacity-40"
-            >
-              {busyId === u.id ? "…" : "🗑"}
-            </button>
+            </div>
           </div>
         ))}
       </div>
