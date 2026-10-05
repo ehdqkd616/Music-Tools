@@ -1,14 +1,14 @@
 import re
 from datetime import timedelta
 
-from fastapi import APIRouter
-from sqlalchemy import select
+from fastapi import APIRouter, Depends
 
-from common.db.models import Media
+from common.db.models import Media, User
 from common.db.session import SessionLocal
-from common.storage import delete_object, presigned_get_url
+from common.media_registry import collect_descendants, delete_unreferenced_objects
+from common.storage import presigned_get_url
 
-from ..errors import ApiError
+from ..deps import get_accessible_media, require_user
 from ..schemas.media import MediaUrlResponse
 
 router = APIRouter()
@@ -75,35 +75,13 @@ def _download_filename(media: Media) -> str:
     return " ".join(parts) + f".{_extension(media)}"
 
 
-def _get_media_or_404(db, media_id: str) -> Media:
-    media = db.get(Media, media_id)
-    if not media:
-        raise ApiError("NOT_FOUND", "미디어를 찾을 수 없습니다.", {"media_id": media_id})
-    return media
-
-
-def _collect_descendants(db, media_id: str) -> list[Media]:
-    """분리/피치/믹스로 파생된 모든 하위 미디어를 재귀적으로 모은다 — DB 행은
-    parent_id의 ON DELETE CASCADE가 알아서 지우지만, S3 오브젝트는 그 전에
-    각자의 storage_key를 알아야 지울 수 있어서 삭제 전에 미리 훑어둔다."""
-    found: list[Media] = []
-    frontier = [media_id]
-    while frontier:
-        children = db.execute(select(Media).where(Media.parent_id.in_(frontier))).scalars().all()
-        if not children:
-            break
-        found.extend(children)
-        frontier = [c.id for c in children]
-    return found
-
-
 @router.get("/{media_id}/url", response_model=MediaUrlResponse)
-def get_media_url(media_id: str) -> MediaUrlResponse:
+def get_media_url(media_id: str, current_user: User = Depends(require_user)) -> MediaUrlResponse:
     """스트리밍/재생용 URL — 브라우저가 inline으로 재생할 수 있어야 하므로
     다운로드 강제(Content-Disposition)를 걸지 않는다."""
     db = SessionLocal()
     try:
-        media = _get_media_or_404(db, media_id)
+        media = get_accessible_media(db, media_id, current_user)
         url = presigned_get_url(media.storage_key, PRESIGN_EXPIRY)
         return MediaUrlResponse(media_id=media_id, url=url, expires_in_sec=int(PRESIGN_EXPIRY.total_seconds()))
     finally:
@@ -111,13 +89,13 @@ def get_media_url(media_id: str) -> MediaUrlResponse:
 
 
 @router.get("/{media_id}/download", response_model=MediaUrlResponse)
-def get_media_download_url(media_id: str) -> MediaUrlResponse:
+def get_media_download_url(media_id: str, current_user: User = Depends(require_user)) -> MediaUrlResponse:
     """다운로드 버튼 전용 — response-content-disposition을 실어 보내 브라우저가
     재생 대신 바로 저장하도록 강제한다 (S3/MinIO의 GetObject 오버라이드 파라미터라
     바이트를 우리 API로 프록시할 필요 없이 presigned URL 하나로 해결된다)."""
     db = SessionLocal()
     try:
-        media = _get_media_or_404(db, media_id)
+        media = get_accessible_media(db, media_id, current_user)
         filename = _download_filename(media)
         url = presigned_get_url(media.storage_key, PRESIGN_EXPIRY, download_filename=filename)
         return MediaUrlResponse(media_id=media_id, url=url, expires_in_sec=int(PRESIGN_EXPIRY.total_seconds()))
@@ -126,18 +104,18 @@ def get_media_download_url(media_id: str) -> MediaUrlResponse:
 
 
 @router.delete("/{media_id}")
-def delete_media(media_id: str) -> dict:
+def delete_media(media_id: str, current_user: User = Depends(require_user)) -> dict:
     """소스 미디어 하나를 지우면 그걸로 만든 스템·피치·믹스 결과물까지 전부 같이
-    지운다 (§8 media.parent_id의 ON DELETE CASCADE + 여기서 S3 오브젝트 정리)."""
+    지운다 (§8 media.parent_id의 ON DELETE CASCADE + 여기서 S3 오브젝트 정리).
+    오브젝트는 다른 사용자의 행과 공유될 수 있어서, 아무도 안 쓰게 된 것만 지운다."""
     db = SessionLocal()
     try:
-        media = _get_media_or_404(db, media_id)
-        descendants = _collect_descendants(db, media_id)
-        for child in descendants:
-            delete_object(child.storage_key)
-        delete_object(media.storage_key)
+        media = get_accessible_media(db, media_id, current_user)
+        descendants = collect_descendants(db, [media_id])
+        storage_keys = {media.storage_key, *(child.storage_key for child in descendants)}
         db.delete(media)
         db.commit()
+        delete_unreferenced_objects(db, storage_keys)
         return {"deleted": media_id, "cascaded": len(descendants)}
     finally:
         db.close()

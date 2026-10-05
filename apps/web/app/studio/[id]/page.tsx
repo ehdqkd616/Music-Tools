@@ -36,6 +36,7 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
   const [finalInstrumentalId, setFinalInstrumentalId] = useState<string | null>(null);
 
   const [stems, setStems] = useState<Stem[]>([]);
+  const [volumes, setVolumes] = useState<Record<string, number>>({ vocals: 1, instrumental: 1 });
   const [downloadingStem, setDownloadingStem] = useState<string | null>(null);
   const [exportUrl, setExportUrl] = useState<string | null>(null);
 
@@ -134,7 +135,10 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
         setFinalInstrumentalId(newInstrumental);
       }
 
-      const mixJob = await api.mix([finalVocals, finalInstrumental], "mp3-320", semitones);
+      const mixJob = await api.mix([finalVocals, finalInstrumental], "mp3-320", semitones, [
+        volumes.vocals ?? 1,
+        volumes.instrumental ?? 1,
+      ]);
       const [finalId] = await waitForJob(mixJob.job_id);
       const { url } = await api.downloadUrl(finalId);
       setExportUrl(url);
@@ -193,7 +197,13 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
 
       {stems.length > 0 && (
         <section className="rounded-lg border border-white/10 bg-panel p-4 space-y-4">
-          <StemPlayer stems={stems} onDownload={handleStemDownload} downloadingName={downloadingStem} />
+          <StemPlayer
+            stems={stems}
+            volumes={volumes}
+            onVolumeChange={(name, value) => setVolumes((prev) => ({ ...prev, [name]: value }))}
+            onDownload={handleStemDownload}
+            downloadingName={downloadingStem}
+          />
 
           {analysis?.key_tonic && analysis?.key_mode && (
             <KeyControl

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminJobList from "@/components/AdminJobList";
 import { ApiError, api } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { translateError } from "@/lib/errors";
@@ -11,6 +12,13 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [tab, setTab] = useState<"users" | "jobs">("users");
+  const [jobUserId, setJobUserId] = useState("");
+
+  function showJobsFor(target: User) {
+    setJobUserId(target.id);
+    setTab("jobs");
+  }
 
   function load() {
     api
@@ -89,11 +97,33 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">관리자 — 회원 관리</h1>
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      {users === null && !error && <p className="text-sm text-white/50">불러오는 중…</p>}
+      <h1 className="text-lg font-semibold">관리자</h1>
+      <div className="flex gap-1 border-b border-white/10">
+        {(
+          [
+            ["users", "회원 관리"],
+            ["jobs", "작업 기록"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-3 py-2 text-sm -mb-px border-b-2 ${
+              tab === key ? "border-accent text-white" : "border-transparent text-white/50 hover:text-white/80"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      <div className="space-y-2">
+      {error && <p className="text-sm text-red-400">{error}</p>}
+
+      {tab === "jobs" && <AdminJobList users={users} userId={jobUserId} onUserIdChange={setJobUserId} />}
+
+      {tab === "users" && users === null && !error && <p className="text-sm text-white/50">불러오는 중…</p>}
+
+      <div className={tab === "users" ? "space-y-2" : "hidden"}>
         {users?.map((u) => (
           <div
             key={u.id}
@@ -110,6 +140,12 @@ export default function AdminPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+              <button
+                onClick={() => showJobsFor(u)}
+                className="rounded-md border border-white/10 hover:border-white/30 px-3 py-1.5 text-xs whitespace-nowrap"
+              >
+                작업 보기
+              </button>
               {u.is_approved ? (
                 <button
                   onClick={() => handleUnapprove(u)}

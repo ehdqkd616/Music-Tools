@@ -8,7 +8,7 @@ from common.db.session import session_scope
 from common.storage import download_file, upload_file
 
 from ..celery_app import app
-from ..job_lifecycle import mark_failed, mark_progress, mark_running, mark_succeeded, register_media
+from ..job_lifecycle import claim_cached_outputs, mark_failed, mark_progress, mark_running, mark_succeeded, register_media
 from ..separation.separator import load_model, save_stem, separate
 
 QUALITY_MODEL = {"fast": "demucs_fast_model", "high": "demucs_hq_model"}
@@ -39,8 +39,12 @@ def separate_stems(self, job_id: str) -> dict:
     cache_key = l2_key(source_hash, model_name, stems)
     cached = cache_get(cache_key)
     if cached:
-        mark_succeeded(job_id, [cached["vocals_media_id"], cached["instrumental_media_id"]], cache_hit=True)
-        return cached
+        output_ids = claim_cached_outputs(
+            [cached.get("vocals_media_id"), cached.get("instrumental_media_id")], user_id, params["media_id"]
+        )
+        if output_ids:
+            mark_succeeded(job_id, output_ids, cache_hit=True)
+            return {"vocals_media_id": output_ids[0], "instrumental_media_id": output_ids[1]}
 
     work_dir = tempfile.mkdtemp(prefix="sep_")
     try:

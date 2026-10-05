@@ -1,26 +1,24 @@
 import os
 import tempfile
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from common.cache import L3_TTL, cache_get, cache_set, l3_key
-from common.db.models import Analysis, Media
+from common.db.models import Analysis, User
 from common.db.session import SessionLocal
 from common.storage import download_file
 
-from ..errors import ApiError
+from ..deps import get_accessible_media, require_user
 from ..schemas.process import AnalyzeResponse
 
 router = APIRouter()
 
 
 @router.get("/{media_id}", response_model=AnalyzeResponse)
-def analyze(media_id: str) -> AnalyzeResponse:
+def analyze(media_id: str, current_user: User = Depends(require_user)) -> AnalyzeResponse:
     db = SessionLocal()
     try:
-        media = db.get(Media, media_id)
-        if not media:
-            raise ApiError("NOT_FOUND", "미디어를 찾을 수 없습니다.", {"media_id": media_id})
+        media = get_accessible_media(db, media_id, current_user)
         content_hash = media.content_hash
 
         cached = cache_get(l3_key(content_hash))

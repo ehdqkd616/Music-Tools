@@ -6,7 +6,7 @@ from datetime import date
 from fastapi import Cookie, Depends, Request
 
 from common.config import get_settings
-from common.db.models import User
+from common.db.models import Media, User
 from common.db.session import SessionLocal
 from common.redis_client import get_redis
 
@@ -37,6 +37,19 @@ def require_admin(current_user: User = Depends(require_user)) -> User:
     if not current_user.is_admin:
         raise ApiError("FORBIDDEN", "관리자만 접근할 수 있습니다.")
     return current_user
+
+
+def can_access(current_user: User, owner_id) -> bool:
+    """본인 소유이거나 관리자면 접근 가능. 주인 없는(익명 시절) 데이터는 관리자만."""
+    return current_user.is_admin or (owner_id is not None and owner_id == current_user.id)
+
+
+def get_accessible_media(db, media_id: str, current_user: User) -> Media:
+    """남의 미디어는 존재 여부도 드러내지 않도록 없는 것과 똑같이 NOT_FOUND로 응답한다."""
+    media = db.get(Media, media_id)
+    if media is None or not can_access(current_user, media.user_id):
+        raise ApiError("NOT_FOUND", "미디어를 찾을 수 없습니다.", {"media_id": media_id})
+    return media
 
 
 def client_subject(request: Request, current_user: User | None = None) -> str:

@@ -2,10 +2,12 @@
 
 from datetime import datetime, timezone
 
+from sqlalchemy import delete
+
 from common.db.models import Media
 from common.db.session import session_scope
+from common.media_registry import collect_descendants, delete_unreferenced_objects
 from common.redis_client import get_redis
-from common.storage import delete_object
 from common.ytdlp import fetch_info
 
 from ..celery_app import app
@@ -41,8 +43,14 @@ def purge_expired_media() -> dict:
     deleted = 0
     with session_scope() as db:
         expired = db.query(Media).filter(Media.expires_at < now).all()
-        for media in expired:
-            delete_object(media.storage_key)
-            db.delete(media)
-            deleted += 1
+        # 부모가 지워지면 DB CASCADE로 자식 행도 사라지니 자식의 오브젝트 키도 미리 모아둔다.
+        descendants = collect_descendants(db, [m.id for m in expired])
+        storage_keys = {m.storage_key for m in [*expired, *descendants]}
+        # 한 번에 지운다 — 부모와 자식이 같이 만료됐을 때 행 단위 delete는 CASCADE로 먼저
+        # 사라진 자식을 다시 지우려다 StaleDataError가 난다.
+        if expired:
+            db.execute(delete(Media).where(Media.id.in_([m.id for m in expired])))
+            deleted = len(expired)
+        # 다른 사용자의 (아직 안 만료된) 행이 같은 파일을 쓰고 있으면 남겨둔다.
+        delete_unreferenced_objects(db, storage_keys)
     return {"deleted": deleted}

@@ -93,3 +93,22 @@ export interface LibraryItem {
   has_stems: boolean;
   created_at: string;
 }
+
+export interface AdminJobItem {
+  job_id: string;
+  type: string;
+  status: JobStatusResponse["status"];
+  progress: number;
+  user_id: string | null;
+  user_email: string | null;
+  media_id: string | null;
+  title: string | null;
+  params: Record<string, unknown>;
+  output_media: string[] | null;
+  error_code: string | null;
+  error_message: string | null;
+  cache_hit: boolean;
+  queued_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}

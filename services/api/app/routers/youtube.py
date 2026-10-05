@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from common.cache import cache_get, cache_set, l1_key, L1_TTL
 from common.celery_client import send_task
 from common.db.models import User
+from common.media_registry import clone_media_for_user
 from common.redis_client import get_redis
 from common.youtube_url import extract_video_id, normalize_youtube_url
 from common.ytdlp import fetch_info
@@ -99,20 +100,26 @@ def extract(
         raise ApiError("INVALID_URL", "유효한 유튜브 URL이 아닙니다.")
     video_id = extract_video_id(normalized)
 
-    cache_key = l1_key(video_id, body.kind, body.format_id)
-    cached = cache_get(cache_key)
-    if cached and cached.get("media_id"):
-        return JobCreatedResponse(job_id=cached.get("job_id", "cached"), status="succeeded", cached=True)
+    params = {"url": normalized, "video_id": video_id, "kind": body.kind, "format_id": body.format_id}
+    cached = cache_get(l1_key(video_id, body.kind, body.format_id))
 
     db: Session = SessionLocal()
     try:
-        job = create_job(
-            db,
-            "extract",
-            None,
-            {"url": normalized, "video_id": video_id, "kind": body.kind, "format_id": body.format_id},
-            user_id=current_user.id,
-        )
+        if cached and cached.get("media_id"):
+            # 다른 사람이 먼저 받은 곡이어도 요청자 명의의 source 행과 작업 기록을 남겨야
+            # "내 작업"에 보이고 소유권 검사도 통과한다 (파일은 그대로 공유).
+            media_id = clone_media_for_user(db, cached["media_id"], current_user.id, parent_id=None)
+            if media_id:
+                db.commit()
+                job = create_job(db, "extract", None, params, user_id=current_user.id)
+                job.status = "succeeded"
+                job.output_media = [media_id]
+                job.cache_hit = True
+                job.progress = 100
+                db.commit()
+                return JobCreatedResponse(job_id=job.id, status="succeeded", cached=True)
+
+        job = create_job(db, "extract", None, params, user_id=current_user.id)
     finally:
         db.close()
 

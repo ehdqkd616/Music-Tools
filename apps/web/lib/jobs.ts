@@ -6,7 +6,7 @@ import { translateError } from "./errors";
  * instead of juggling per-step component state. */
 export function waitForJob(jobId: string): Promise<string[]> {
   return new Promise((resolve, reject) => {
-    const source = new EventSource(api.jobEventsUrl(jobId));
+    const source = new EventSource(api.jobEventsUrl(jobId), { withCredentials: true });
     let done = false;
 
     source.addEventListener("complete", (e) => {

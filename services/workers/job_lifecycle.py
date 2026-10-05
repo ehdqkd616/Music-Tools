@@ -5,11 +5,28 @@ from datetime import datetime, timezone
 from common.cache import publish_progress
 from common.db.models import Job
 from common.db.session import session_scope
+from common.media_registry import clone_media_for_user
 from common.media_registry import register_media  # noqa: F401 — re-exported for task modules
 
 RETRYABLE_CODES = {"EXTRACTION_FAILED", "RATE_LIMITED", "QUEUE_FULL", "GPU_OOM"}
 MAX_ATTEMPTS = 3
 BACKOFF_SEC = [2, 8, 32]
+
+
+def claim_cached_outputs(media_ids: list[str | None], user_id, parent_id: str | None) -> list[str] | None:
+    """캐시 적중 결과물을 이 작업의 요청자 명의로 복제한다 (API 쪽 캐시 처리와 같은 규칙).
+    하나라도 이미 지워졌으면 None — 호출부는 캐시 미스로 보고 새로 처리한다."""
+    if not all(media_ids):
+        return None
+    with session_scope() as db:
+        output_ids = []
+        for media_id in media_ids:
+            cloned = clone_media_for_user(db, media_id, user_id, parent_id=parent_id)
+            if cloned is None:
+                db.rollback()
+                return None
+            output_ids.append(cloned)
+    return output_ids
 
 
 def mark_running(job_id: str) -> None:

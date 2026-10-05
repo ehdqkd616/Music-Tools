@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from pydantic import BaseModel, Field
 
 
@@ -20,7 +22,9 @@ class TempoRequest(BaseModel):
 
 
 class MixRequest(BaseModel):
-    media_ids: list[str]
+    media_ids: list[str] = Field(min_length=1)
+    # media_ids와 같은 순서의 선형 볼륨 배율 (스튜디오 볼륨 슬라이더 값, 1.0 = 원래 크기).
+    gains: list[Annotated[float, Field(ge=0, le=2)]] | None = None
     output_format: str = "mp3-320"
     semitones: float | None = None  # 표시용 — 실제 믹스에 반영되진 않고 다운로드 파일명에만 쓰임
 

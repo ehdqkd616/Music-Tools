@@ -1,26 +1,32 @@
 import asyncio
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
-from common.db.models import Job
+from common.db.models import Job, User
 from common.db.session import SessionLocal
 from common.redis_client import get_redis
 
+from ..deps import can_access, require_user
 from ..errors import ApiError
 from ..schemas.jobs import JobStatusResponse
 
 router = APIRouter()
 
 
+def _get_accessible_job(db, job_id: str, current_user: User) -> Job:
+    job = db.get(Job, job_id)
+    if job is None or not can_access(current_user, job.user_id):
+        raise ApiError("NOT_FOUND", "작업을 찾을 수 없습니다.", {"job_id": job_id})
+    return job
+
+
 @router.get("/{job_id}", response_model=JobStatusResponse)
-def get_job(job_id: str) -> JobStatusResponse:
+def get_job(job_id: str, current_user: User = Depends(require_user)) -> JobStatusResponse:
     db = SessionLocal()
     try:
-        job = db.get(Job, job_id)
-        if not job:
-            raise ApiError("NOT_FOUND", "작업을 찾을 수 없습니다.", {"job_id": job_id})
+        job = _get_accessible_job(db, job_id, current_user)
         return JobStatusResponse(
             job_id=job.id,
             type=job.type,
@@ -39,9 +45,15 @@ def get_job(job_id: str) -> JobStatusResponse:
 
 
 @router.get("/{job_id}/events")
-async def job_events(job_id: str) -> StreamingResponse:
+async def job_events(job_id: str, current_user: User = Depends(require_user)) -> StreamingResponse:
     """§7.2 SSE progress stream — subscribes to the job's Redis Pub/Sub channel
     that every worker task publishes to via `common.cache.publish_progress`."""
+    # 권한 검사는 스트림을 열기 전에 — 제너레이터 안에서 던지면 200 헤더가 이미 나간 뒤다.
+    db = SessionLocal()
+    try:
+        _get_accessible_job(db, job_id, current_user)
+    finally:
+        db.close()
 
     async def event_stream():
         r = get_redis()

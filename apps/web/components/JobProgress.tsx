@@ -26,7 +26,7 @@ export default function JobProgress({ jobId, onComplete, onError }: Props) {
 
   useEffect(() => {
     doneRef.current = false;
-    const source = new EventSource(api.jobEventsUrl(jobId));
+    const source = new EventSource(api.jobEventsUrl(jobId), { withCredentials: true });
 
     source.addEventListener("progress", (e) => {
       const data = JSON.parse((e as MessageEvent).data);

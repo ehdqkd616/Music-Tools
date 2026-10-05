@@ -16,7 +16,7 @@ from common.storage import download_file, upload_file
 from ..celery_app import app
 from ..dsp.analyze import analyze_file
 from ..dsp.pitch import pitch_shift, time_stretch
-from ..job_lifecycle import mark_failed, mark_progress, mark_running, mark_succeeded, register_media
+from ..job_lifecycle import claim_cached_outputs, mark_failed, mark_progress, mark_running, mark_succeeded, register_media
 
 
 def _load_job(job_id: str) -> tuple[dict, Media, uuid.UUID | None]:
@@ -41,8 +41,10 @@ def pitch_shift_stems(self, job_id: str) -> dict:
     cache_key = pitch_key(media.content_hash, semitones, stem_type, preview)
     cached = cache_get(cache_key)
     if cached and cached.get("media_id"):
-        mark_succeeded(job_id, [cached["media_id"]], cache_hit=True)
-        return cached
+        output_ids = claim_cached_outputs([cached["media_id"]], user_id, media.id)
+        if output_ids:
+            mark_succeeded(job_id, output_ids, cache_hit=True)
+            return {"media_id": output_ids[0]}
 
     work_dir = tempfile.mkdtemp(prefix="pitch_")
     try:
@@ -101,8 +103,10 @@ def time_stretch_stems(self, job_id: str) -> dict:
     cache_key = tempo_key(media.content_hash, ratio)
     cached = cache_get(cache_key)
     if cached and cached.get("media_id"):
-        mark_succeeded(job_id, [cached["media_id"]], cache_hit=True)
-        return cached
+        output_ids = claim_cached_outputs([cached["media_id"]], user_id, media.id)
+        if output_ids:
+            mark_succeeded(job_id, output_ids, cache_hit=True)
+            return {"media_id": output_ids[0]}
 
     work_dir = tempfile.mkdtemp(prefix="tempo_")
     try:
@@ -170,10 +174,15 @@ def mix_stems(self, job_id: str) -> dict:
             arrays.append(data)
         mark_progress(job_id, 50, "mixing")
 
+        # 스튜디오 볼륨 슬라이더 값 (선형 배율, WebAudio GainNode와 같은 단위). 없으면 1:1.
+        gains = params.get("gains") or [1.0] * len(arrays)
         max_len = max(a.shape[0] for a in arrays)
-        mixed = np.zeros((max_len, arrays[0].shape[1]), dtype=np.float32)
-        for a in arrays:
-            mixed[: a.shape[0]] += a
+        max_ch = max(a.shape[1] for a in arrays)
+        mixed = np.zeros((max_len, max_ch), dtype=np.float32)
+        for a, gain in zip(arrays, gains):
+            if a.shape[1] != max_ch:
+                a = np.repeat(a[:, :1], max_ch, axis=1)  # 모노 스템을 스테레오 믹스에 맞춤
+            mixed[: a.shape[0]] += a * float(gain)
         peak = np.abs(mixed).max()
         if peak > 1.0:
             mixed = mixed / peak  # simple clip-safety normalization
@@ -210,6 +219,7 @@ def mix_stems(self, job_id: str) -> dict:
                 "sources": params["media_ids"],
                 "output_format": output_format,
                 "semitones": params.get("semitones"),
+                "gains": params.get("gains"),
             },
             user_id=user_id,
         )

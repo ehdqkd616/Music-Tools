@@ -1,4 +1,5 @@
 import type {
+  AdminJobItem,
   AnalyzeResponse,
   ApiErrorBody,
   JobCreatedResponse,
@@ -79,10 +80,10 @@ export const api = {
       body: JSON.stringify({ media_id, semitones, stem_type, preview }),
     }),
 
-  mix: (media_ids: string[], output_format: string = "mp3-320", semitones?: number) =>
+  mix: (media_ids: string[], output_format: string = "mp3-320", semitones?: number, gains?: number[]) =>
     request<JobCreatedResponse>("/api/v1/process/mix", {
       method: "POST",
-      body: JSON.stringify({ media_ids, output_format, semitones }),
+      body: JSON.stringify({ media_ids, output_format, semitones, gains }),
     }),
 
   analyze: (media_id: string) => request<AnalyzeResponse>(`/api/v1/analyze/${media_id}`),
@@ -118,6 +119,14 @@ export const api = {
 
   adminDeleteUser: (userId: string) =>
     request<{ deleted: string }>(`/api/v1/admin/users/${userId}`, { method: "DELETE" }),
+
+  adminListJobs: (opts: { userId?: string; includePreviews?: boolean } = {}) => {
+    const params = new URLSearchParams();
+    if (opts.userId) params.set("user_id", opts.userId);
+    if (opts.includePreviews) params.set("include_previews", "true");
+    const qs = params.toString();
+    return request<AdminJobItem[]>(`/api/v1/admin/jobs${qs ? `?${qs}` : ""}`);
+  },
 
   library: () => request<LibraryItem[]>("/api/v1/library"),
 
