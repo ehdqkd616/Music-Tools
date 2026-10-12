@@ -22,11 +22,11 @@ export default function SiteHeader() {
             <>
               {user.is_admin && (
                 <a href="/admin" className="hover:text-white whitespace-nowrap">
-                  관리자
+                  관리자 페이지
                 </a>
               )}
-              <a href="/account" className="text-white/40 hover:text-white truncate max-w-[8rem] sm:max-w-[10rem]">
-                {user.name || user.username}
+              <a href="/account" title={user.username} className="hover:text-white whitespace-nowrap">
+                내 정보
               </a>
               <button onClick={logout} className="hover:text-white whitespace-nowrap">
                 로그아웃
