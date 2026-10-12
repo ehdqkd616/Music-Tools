@@ -71,7 +71,7 @@ export interface ApiErrorBody {
 
 export interface User {
   id: string;
-  email: string;
+  username: string;
   tier: string;
   is_approved: boolean;
   is_admin: boolean;

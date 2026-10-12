@@ -99,7 +99,7 @@ export default function AdminJobList({
           <option value="">전체 회원</option>
           {users?.map((u) => (
             <option key={u.id} value={u.id}>
-              {u.email}
+              {u.username}
             </option>
           ))}
         </select>

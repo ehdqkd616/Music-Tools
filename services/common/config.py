@@ -32,8 +32,7 @@ class Settings(BaseSettings):
     demucs_fast_model: str = "htdemucs"
     demucs_hq_model: str = "htdemucs_ft"
 
-    # Bootstrapped as an approved admin user on API startup if set and not already present.
-    admin_email: str = ""
+    # Password of the shared "admin" account, synced on every API startup.
     admin_password: str = ""
 
     # 회원가입 시 승인 요청 메일 (비워두면 발송 안 함). Gmail이면 앱 비밀번호를 쓴다.

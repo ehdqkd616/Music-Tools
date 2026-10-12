@@ -99,11 +99,11 @@ export const api = {
   // which stays undecorated so <audio>/WaveSurfer can stream it normally).
   downloadUrl: (media_id: string) => request<MediaUrlResponse>(`/api/v1/media/${media_id}/download`),
 
-  signup: (email: string, password: string) =>
-    request<User>("/api/v1/auth/signup", { method: "POST", body: JSON.stringify({ email, password }) }),
+  signup: (username: string, password: string) =>
+    request<User>("/api/v1/auth/signup", { method: "POST", body: JSON.stringify({ username, password }) }),
 
-  login: (email: string, password: string) =>
-    request<User>("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  login: (username: string, password: string) =>
+    request<User>("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
 
   logout: () => request<{ logged_out: boolean }>("/api/v1/auth/logout", { method: "POST" }),
 

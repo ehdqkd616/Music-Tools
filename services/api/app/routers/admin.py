@@ -17,7 +17,7 @@ router = APIRouter()
 def _to_user_response(user: User) -> UserResponse:
     return UserResponse(
         id=str(user.id),
-        email=user.email,
+        username=user.username,
         tier=user.tier,
         is_approved=user.is_approved,
         is_admin=user.is_admin,
@@ -120,7 +120,7 @@ def list_jobs(
     """전체 회원의 작업 기록 (최신순). user_id로 특정 회원만 필터링할 수 있다."""
     db = SessionLocal()
     try:
-        stmt = select(Job, User.email).outerjoin(User, Job.user_id == User.id)
+        stmt = select(Job, User.username).outerjoin(User, Job.user_id == User.id)
         if user_id:
             stmt = stmt.where(Job.user_id == user_id)
         if not include_previews:
@@ -134,7 +134,7 @@ def list_jobs(
         sources = _resolve_sources(db, {mid for job, _ in rows if (mid := ref_media(job))})
 
         items = []
-        for job, email in rows:
+        for job, username in rows:
             mid = ref_media(job)
             source = sources.get(mid) if mid else None
             items.append(
@@ -144,7 +144,7 @@ def list_jobs(
                     status=job.status,
                     progress=job.progress,
                     user_id=str(job.user_id) if job.user_id else None,
-                    user_email=email,
+                    user_email=username,
                     media_id=source.id if source else None,
                     title=source.title if source else None,
                     params=job.params or {},
