@@ -25,7 +25,9 @@ export default function SiteHeader() {
                   관리자
                 </a>
               )}
-              <span className="text-white/40 truncate max-w-[8rem] sm:max-w-[10rem]">{user.username}</span>
+              <a href="/account" className="text-white/40 hover:text-white truncate max-w-[8rem] sm:max-w-[10rem]">
+                {user.name || user.username}
+              </a>
               <button onClick={logout} className="hover:text-white whitespace-nowrap">
                 로그아웃
               </button>

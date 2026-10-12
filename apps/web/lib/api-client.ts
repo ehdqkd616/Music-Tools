@@ -1,4 +1,8 @@
 import type {
+  AdminStats,
+  AdminUser,
+  AuditLogItem,
+  SignupInput,
   AdminJobItem,
   AnalyzeResponse,
   ApiErrorBody,
@@ -99,8 +103,8 @@ export const api = {
   // which stays undecorated so <audio>/WaveSurfer can stream it normally).
   downloadUrl: (media_id: string) => request<MediaUrlResponse>(`/api/v1/media/${media_id}/download`),
 
-  signup: (username: string, password: string) =>
-    request<User>("/api/v1/auth/signup", { method: "POST", body: JSON.stringify({ username, password }) }),
+  signup: (body: SignupInput) =>
+    request<{ status: "pending"; message: string }>("/api/v1/auth/signup", { method: "POST", body: JSON.stringify(body) }),
 
   login: (username: string, password: string) =>
     request<User>("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
@@ -109,16 +113,34 @@ export const api = {
 
   me: () => request<MeResponse>("/api/v1/auth/me"),
 
-  adminListUsers: () => request<User[]>("/api/v1/admin/users"),
+  changePassword: (current_password: string, new_password: string) =>
+    request<{ ok: boolean }>("/api/v1/auth/password", { method: "PATCH", body: JSON.stringify({ current_password, new_password }) }),
 
-  adminApprove: (userId: string) =>
-    request<User>(`/api/v1/admin/users/${userId}/approve`, { method: "POST" }),
+  adminStats: () => request<AdminStats>("/api/v1/admin/stats"),
 
-  adminUnapprove: (userId: string) =>
-    request<User>(`/api/v1/admin/users/${userId}/unapprove`, { method: "POST" }),
+  adminListUsers: (status = "", q = "") =>
+    request<AdminUser[]>(`/api/v1/admin/users?${new URLSearchParams({ ...(status ? { status } : {}), ...(q ? { q } : {}) })}`),
+
+  adminApprove: (userId: string) => request<AdminUser>(`/api/v1/admin/users/${userId}/approve`, { method: "POST" }),
+
+  adminReject: (userId: string, reason: string) =>
+    request<AdminUser>(`/api/v1/admin/users/${userId}/reject`, { method: "POST", body: JSON.stringify({ reason }) }),
+
+  adminSuspend: (userId: string) => request<AdminUser>(`/api/v1/admin/users/${userId}/suspend`, { method: "POST" }),
+
+  adminUnsuspend: (userId: string) => request<AdminUser>(`/api/v1/admin/users/${userId}/unsuspend`, { method: "POST" }),
+
+  adminBulkApprove: (userIds: string[]) =>
+    request<{ approved: number }>("/api/v1/admin/users/bulk-approve", { method: "POST", body: JSON.stringify({ user_ids: userIds }) }),
+
+  adminTempPassword: (userId: string) =>
+    request<{ temp_password: string }>(`/api/v1/admin/users/${userId}/temp-password`, { method: "POST" }),
 
   adminDeleteUser: (userId: string) =>
     request<{ deleted: string }>(`/api/v1/admin/users/${userId}`, { method: "DELETE" }),
+
+  adminAuditLogs: (action = "") =>
+    request<{ items: AuditLogItem[] }>(`/api/v1/admin/audit-logs${action ? `?action=${encodeURIComponent(action)}` : ""}`),
 
   adminListJobs: (opts: { userId?: string; includePreviews?: boolean } = {}) => {
     const params = new URLSearchParams();
