@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import FormatPicker from "@/components/FormatPicker";
 import JobProgress from "@/components/JobProgress";
 import UrlInput from "@/components/UrlInput";
+import Landing from "@/components/landing/Landing";
 import { api, ApiError, triggerDownload } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import type { YoutubeInfoResponse } from "@/lib/types";
@@ -102,30 +103,8 @@ export default function Home() {
 
   if (authLoading) return <p className="text-sm text-white/50">불러오는 중…</p>;
 
-  if (!user) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-xl font-semibold">로그인이 필요합니다</h1>
-        <p className="text-sm text-white/50">
-          유튜브 추출, 파일 업로드, 보컬/MR 분리, 키·템포 조절은 로그인한 계정만 이용할 수 있어요.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href="/login"
-            className="rounded-md bg-accent text-ink font-medium px-4 py-2 text-sm whitespace-nowrap"
-          >
-            로그인
-          </a>
-          <a
-            href="/signup"
-            className="rounded-md bg-white/10 hover:bg-white/20 px-4 py-2 text-sm whitespace-nowrap"
-          >
-            회원가입
-          </a>
-        </div>
-      </div>
-    );
-  }
+  // 로그인 전: 서비스 소개
+  if (!user) return <Landing className="lp-embedded lp-dark" accent="#6ee7b7" />;
 
   return (
     <div className="space-y-8">
