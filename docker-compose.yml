@@ -89,6 +89,22 @@ services:
       - ./services/common:/srv/common
       - demucs-models:/root/.cache/torch
 
+  # Lead/backing vocal split — CPU-only and in its own image, because
+  # audio-separator's numpy/torch versions conflict with the other workers.
+  worker-mdx:
+    build: { context: ., dockerfile: services/workers/Dockerfile.mdx }
+    env_file: .env
+    command: celery -A workers.celery_app worker -Q mdx -c 1 -P solo --loglevel=INFO
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    volumes:
+      - ./services/workers:/srv/workers
+      - ./services/common:/srv/common
+      - mdx-models:/tmp/audio-separator-models
+
   worker-dsp:
     build: { context: ., dockerfile: services/workers/Dockerfile }
     env_file: .env
@@ -130,5 +146,6 @@ volumes:
   pgdata:
   miniodata:
   demucs-models:
+  mdx-models:
   web-node-modules:
   web-next:

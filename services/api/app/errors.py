@@ -17,6 +17,7 @@ ERROR_TABLE: dict[str, tuple[int, bool]] = {
     "QUEUE_FULL": (503, True),
     "DOWNLOAD_TEMPORARILY_DISABLED": (503, True),
     "GPU_OOM": (500, True),
+    "SEPARATION_FAILED": (500, False),
     "NOT_FOUND": (404, False),
     "FILE_TOO_LARGE": (400, False),
     "UNSUPPORTED_FORMAT": (400, False),

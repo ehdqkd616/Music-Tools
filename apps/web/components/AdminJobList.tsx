@@ -9,6 +9,7 @@ import type { AdminJobItem, User } from "@/lib/types";
 const TYPE_LABEL: Record<string, string> = {
   extract: "유튜브 가져오기",
   separate: "보컬 분리",
+  split_vocals: "코러스 분리",
   pitch: "키 변경",
   tempo: "템포 변경",
   mix: "믹스/내보내기",

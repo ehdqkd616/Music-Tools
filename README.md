@@ -4,6 +4,7 @@
 
 `오디오_플랫폼_설계서_v1.0.md`의 Phase 1 MVP 범위를 구현한 로컬 개발용 스캐폴딩입니다.
 유튜브 URL 또는 파일 업로드 → 보컬/MR 분리 → 키 변경 → 내보내기까지의 파이프라인이 동작합니다.
+스튜디오의 "보컬 추출"에서 보컬 전체, 코러스를 뺀 보컬, 코러스를 각각 받을 수 있습니다.
 
 ## 이 환경에서 달라진 점
 
@@ -71,6 +72,8 @@ tools/server-manager/     서버 시작/중지/로그 확인용 Windows GUI
 
 ## 알려진 제약
 
+- 코러스 분리는 `worker-mdx`가 CPU로 처리해 곡 길이의 0.6배 안팎이 걸리고, 4분대 곡 기준 메모리를
+  약 3GB 씁니다. 리드와 화음이 겹치는 구간은 일부 섞여 나올 수 있습니다.
 - Rubber Band CLI는 libsndfile 포맷(WAV/AIFF/FLAC)만 읽고 쓸 수 있어, 그 외 포맷은 ffmpeg으로
   WAV 변환 후 처리합니다 (`services/common/audio_convert.py`).
 - `packages/shared-types`에 해당하는 OpenAPI → TypeScript 코드 생성 스텝은 아직 없고,

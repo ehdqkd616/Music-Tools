@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     demucs_fast_model: str = "htdemucs"
     demucs_hq_model: str = "htdemucs_ft"
 
+    # audio-separator 카라오케 모델 — Demucs 보컬 스템을 리드/코러스로 나눈다.
+    karaoke_model: str = "UVR_MDXNET_KARA_2.onnx"
+
     # Password of the shared "admin" account, synced on every API startup.
     admin_password: str = ""
 

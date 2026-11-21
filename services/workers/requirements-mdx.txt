@@ -1,0 +1,29 @@
+# Lead/backing vocal split (audio-separator) — a self-contained requirements
+# file, NOT layered on requirements.txt: audio-separator needs numpy>=2 and a
+# much newer torch, which conflict with that file's numpy==1.26.4 and
+# worker-separate's torch==2.4.1.
+#
+# CPU-only on purpose: this host's GTX 1050 Ti (Pascal) isn't supported by the
+# CUDA builds this torch/onnxruntime target, and staying off the GPU also keeps
+# this worker from competing with Demucs for its 4GB of VRAM.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.0+cpu
+audio-separator==0.47.0
+onnxruntime==1.30.0
+
+# Needed for `workers.tasks` to import (Celery task registration) and for the
+# task's own DB/storage work.
+pydantic==2.9.0
+pydantic-settings==2.5.2
+celery==5.4.0
+kombu==5.6.2  # newer kombu requires redis>=6.1, which conflicts with the pin below
+redis==5.0.8
+sqlalchemy==2.0.35
+psycopg[binary]==3.2.2
+boto3==1.35.0
+yt-dlp>=2024.10.0
+mutagen==1.47.0
+librosa>=0.10.2
+soundfile==0.12.1
+pyloudnorm==0.1.1
+scipy>=1.14.0

@@ -107,7 +107,7 @@ class Job(Base):
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
-    type: Mapped[str] = mapped_column(Text, nullable=False)  # extract|separate|pitch|tempo|mix
+    type: Mapped[str] = mapped_column(Text, nullable=False)  # extract|separate|split_vocals|pitch|tempo|mix
     status: Mapped[str] = mapped_column(Text, nullable=False, default="queued")
     input_media: Mapped[str | None] = mapped_column(Text, ForeignKey("media.id", ondelete="SET NULL"))
     params: Mapped[dict] = mapped_column(JSONB, server_default="{}")

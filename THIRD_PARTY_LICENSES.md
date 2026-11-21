@@ -9,6 +9,7 @@
 |---|---|---|---|
 | yt-dlp | 유튜브 추출 | Unlicense (PD) | |
 | Demucs v4 | 소스 분리 | MIT | |
+| audio-separator | 리드/코러스 분리 | MIT | 카라오케 모델(`UVR_MDXNET_KARA_2`) 가중치는 첫 사용 시 내려받음. 상업화 전 가중치 이용 조건 확인 필요 |
 | PyTorch / torchaudio | ML 런타임 | BSD-3 | CPU 빌드 사용 (§ README 참고) |
 | librosa | 오디오 분석 | ISC | |
 | pyloudnorm | 라우드니스 측정 | MIT | |

@@ -9,6 +9,10 @@ class SeparateRequest(BaseModel):
     quality: str = "fast"  # "fast"=htdemucs | "high"=htdemucs_ft
 
 
+class SplitVocalsRequest(BaseModel):
+    media_id: str  # 분리 작업이 만든 보컬 스템
+
+
 class PitchRequest(BaseModel):
     media_id: str
     semitones: float = Field(ge=-12, le=12)

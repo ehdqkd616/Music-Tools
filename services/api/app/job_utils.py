@@ -11,6 +11,7 @@ ETA_SEC = {
     "extract": 20,
     "separate_fast": 60,
     "separate_high": 180,
+    "split_vocals": 150,
     "pitch": 15,
     "tempo": 15,
     "mix": 10,
@@ -19,6 +20,7 @@ ETA_SEC = {
 QUEUE_NAME = {
     "extract": "download",
     "separate": "separate",
+    "split_vocals": "mdx",
     "pitch": "dsp",
     "tempo": "dsp",
     "mix": "dsp",

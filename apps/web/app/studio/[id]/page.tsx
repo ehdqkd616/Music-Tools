@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import JobProgress from "@/components/JobProgress";
 import KeyControl from "@/components/KeyControl";
 import StemPlayer, { Stem } from "@/components/StemPlayer";
+import VocalExtract from "@/components/VocalExtract";
 import { api, ApiError, triggerDownload } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { waitForJob } from "@/lib/jobs";
@@ -229,6 +230,8 @@ export default function StudioPage({ params }: { params: Promise<{ id: string }>
           )}
         </section>
       )}
+
+      {originalVocalsId && <VocalExtract vocalsId={originalVocalsId} />}
     </div>
   );
 }

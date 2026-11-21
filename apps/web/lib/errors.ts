@@ -11,6 +11,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   RATE_LIMITED: "일일 사용 한도를 초과했습니다. 잠시 후 다시 시도해주세요.",
   DOWNLOAD_TEMPORARILY_DISABLED: "유튜브 다운로드 기능이 일시적으로 비활성화되었습니다.",
   EXTRACTION_FAILED: "추출에 실패했습니다. 다른 영상으로 시도하거나 잠시 후 다시 시도해주세요.",
+  SEPARATION_FAILED: "코러스 분리에 실패했습니다. 잠시 후 다시 시도해주세요.",
   GPU_OOM: "처리 중 메모리 부족이 발생했습니다. 잠시 후 다시 시도해주세요.",
   USERNAME_TAKEN: "이미 사용 중인 아이디입니다.",
   INVALID_CREDENTIALS: "아이디 또는 비밀번호가 올바르지 않습니다.",

@@ -27,7 +27,15 @@ EXT_BY_MIME = {
     "video/mp4": "mp4",
 }
 
-STEM_LABEL_EN = {"vocals": "Vocals", "instrumental": "MR", "other": "MR", "drums": "Drums", "bass": "Bass"}
+STEM_LABEL_EN = {
+    "vocals": "Vocals",
+    "lead": "Lead Vocals",
+    "backing": "Chorus",
+    "instrumental": "MR",
+    "other": "MR",
+    "drums": "Drums",
+    "bass": "Bass",
+}
 
 
 def _extension(media: Media) -> str:

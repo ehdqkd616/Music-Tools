@@ -11,7 +11,7 @@ from ..deps import enforce_separate_quota, get_accessible_media, require_user
 from ..errors import ApiError
 from ..job_utils import ETA_SEC, create_job, queue_position
 from ..schemas.jobs import JobCreatedResponse
-from ..schemas.process import MixRequest, PitchRequest, SeparateRequest, TempoRequest
+from ..schemas.process import MixRequest, PitchRequest, SeparateRequest, SplitVocalsRequest, TempoRequest
 
 router = APIRouter()
 
@@ -66,6 +66,40 @@ def process_separate(body: SeparateRequest, current_user: User = Depends(require
     eta = ETA_SEC["separate_high"] if body.quality == "high" else ETA_SEC["separate_fast"]
     return JobCreatedResponse(
         job_id=job.id, status="queued", queue_position=queue_position("separate"), eta_sec=eta, cached=False
+    )
+
+
+@router.post(
+    "/split-vocals", response_model=JobCreatedResponse, dependencies=[Depends(enforce_separate_quota)]
+)
+def process_split_vocals(body: SplitVocalsRequest, current_user: User = Depends(require_user)) -> JobCreatedResponse:
+    """보컬 스템을 리드/코러스로 나눈다. outputs[0]=리드, [1]=코러스."""
+    db = SessionLocal()
+    try:
+        media = get_accessible_media(db, body.media_id, current_user)
+        # 카라오케 모델은 입력에서 리드만 빼므로, 완성곡을 넣으면 "코러스"에 반주가 섞여 나온다.
+        if (media.lineage or {}).get("stem") != "vocals":
+            raise ApiError("VALIDATION_ERROR", "보컬 스템만 코러스를 분리할 수 있어요.", {"media_id": body.media_id})
+
+        cached = cache_get(l2_key(media.content_hash, get_settings().karaoke_model, 2))
+        if cached:
+            cached_ids = [cached.get("lead_media_id"), cached.get("backing_media_id")]
+            if all(cached_ids):
+                job = _record_cache_hit(db, "split_vocals", body, current_user, cached_ids)
+                if job:
+                    return JobCreatedResponse(job_id=job.id, status="succeeded", cached=True)
+
+        job = create_job(db, "split_vocals", body.media_id, body.model_dump(), user_id=current_user.id)
+    finally:
+        db.close()
+
+    send_task("tasks.split_vocals", args=[job.id], queue="mdx")
+    return JobCreatedResponse(
+        job_id=job.id,
+        status="queued",
+        queue_position=queue_position("split_vocals"),
+        eta_sec=ETA_SEC["split_vocals"],
+        cached=False,
     )
 
 
