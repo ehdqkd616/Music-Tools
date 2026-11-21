@@ -72,10 +72,10 @@ export const api = {
     return res.json();
   },
 
-  separate: (media_id: string, quality: "fast" | "high" = "fast") =>
+  separate: (media_id: string, quality: "fast" | "high" = "fast", stems: 2 | 4 | 6 = 2) =>
     request<JobCreatedResponse>("/api/v1/process/separate", {
       method: "POST",
-      body: JSON.stringify({ media_id, stems: 2, quality }),
+      body: JSON.stringify({ media_id, stems, quality }),
     }),
 
   splitVocals: (media_id: string) =>
@@ -84,10 +84,10 @@ export const api = {
       body: JSON.stringify({ media_id }),
     }),
 
-  transcribe: (media_id: string) =>
+  transcribe: (media_id: string, instrument: string = "piano") =>
     request<JobCreatedResponse>("/api/v1/process/transcribe", {
       method: "POST",
-      body: JSON.stringify({ media_id }),
+      body: JSON.stringify({ media_id, instrument }),
     }),
 
   pitch: (media_id: string, semitones: number, stem_type: string = "other", preview: boolean = false) =>

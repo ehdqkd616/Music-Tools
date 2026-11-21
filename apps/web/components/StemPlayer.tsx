@@ -16,6 +16,8 @@ interface Props {
   onVolumeChange: (name: string, value: number) => void;
   onDownload: (stem: Stem) => void;
   downloadingName?: string | null;
+  // 트랙별 "솔로" 버튼 — 켠 트랙만 들린다. 볼륨 값(내보내기 믹스용)은 바꾸지 않는다.
+  soloable?: boolean;
 }
 
 // Each stem gets its own WaveSurfer instance, all playing through ONE shared
@@ -31,15 +33,23 @@ interface Props {
 //  3. wavesurfer의 WebAudioPlayer는 destroy 때 AudioContext를 닫지 않아서, 미리듣기
 //     때마다 컨텍스트가 쌓이다 iOS 개수 제한에 걸린다 → 하나만 만들어 공유하고
 //     언마운트 때 닫는다.
-export default function StemPlayer({ stems, volumes, onVolumeChange, onDownload, downloadingName }: Props) {
+export default function StemPlayer({ stems, volumes, onVolumeChange, onDownload, downloadingName, soloable }: Props) {
   const containerRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const wsRefs = useRef<Record<string, any>>({});
   // 미리듣기로 스템이 바뀌어 WaveSurfer를 새로 만들 때도 현재 볼륨을 이어받도록 ref로 읽는다.
   const volumesRef = useRef(volumes);
   volumesRef.current = volumes;
+  const [solo, setSolo] = useState<Set<string>>(new Set());
+  const soloRef = useRef(solo);
+  soloRef.current = solo;
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // 솔로가 하나라도 켜져 있으면 솔로가 아닌 트랙은 0으로 들린다.
+  function audibleVolume(name: string, vols = volumesRef.current, soloSet = soloRef.current): number {
+    return soloSet.size > 0 && !soloSet.has(name) ? 0 : (vols[name] ?? 1);
+  }
 
   function getAudioContext(): AudioContext {
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
@@ -59,6 +69,8 @@ export default function StemPlayer({ stems, volumes, onVolumeChange, onDownload,
     let cancelled = false;
     setReady(false);
     setPlaying(false);
+    soloRef.current = new Set();
+    setSolo(new Set());
 
     (async () => {
       const [{ default: WaveSurfer }, { default: WebAudioPlayer }] = await Promise.all([
@@ -81,7 +93,7 @@ export default function StemPlayer({ stems, volumes, onVolumeChange, onDownload,
           // HTMLMediaElement를 흉내 내는 플레이어라 타입만 맞춰준다.
           media: new WebAudioPlayer(audioContext) as unknown as HTMLMediaElement,
         });
-        ws.setVolume(volumesRef.current[stem.name] ?? 1);
+        ws.setVolume(audibleVolume(stem.name));
         wsRefs.current[stem.name] = ws;
       }
 
@@ -127,8 +139,18 @@ export default function StemPlayer({ stems, volumes, onVolumeChange, onDownload,
   }
 
   function setVolume(name: string, value: number) {
-    wsRefs.current[name]?.setVolume(value);
+    wsRefs.current[name]?.setVolume(audibleVolume(name, { ...volumesRef.current, [name]: value }));
     onVolumeChange(name, value);
+  }
+
+  function toggleSolo(name: string) {
+    const next = new Set(solo);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setSolo(next);
+    for (const [stemName, ws] of Object.entries(wsRefs.current)) {
+      ws.setVolume(audibleVolume(stemName, volumesRef.current, next));
+    }
   }
 
   return (
@@ -146,6 +168,18 @@ export default function StemPlayer({ stems, volumes, onVolumeChange, onDownload,
             onChange={(e) => setVolume(stem.name, parseFloat(e.target.value))}
             className="w-20"
           />
+          {soloable && (
+            <button
+              onClick={() => toggleSolo(stem.name)}
+              aria-pressed={solo.has(stem.name)}
+              title={`${stem.label}만 듣기`}
+              className={`rounded-md border px-2 py-1 text-xs ${
+                solo.has(stem.name) ? "border-accent bg-accent text-ink" : "border-white/10 hover:border-white/30"
+              }`}
+            >
+              솔로
+            </button>
+          )}
           <button
             onClick={() => onDownload(stem)}
             disabled={downloadingName === stem.name}

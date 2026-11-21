@@ -11,6 +11,8 @@
 | Demucs v4 | 소스 분리 | MIT | |
 | audio-separator | 리드/코러스 분리 | MIT | 카라오케 모델(`UVR_MDXNET_KARA_2`) 가중치는 첫 사용 시 내려받음. 상업화 전 가중치 이용 조건 확인 필요 |
 | piano_transcription_inference / torchlibrosa | 피아노 채보 | MIT | 체크포인트(Zenodo 4034264)는 이미지 빌드 때 내려받음. 상업화 전 가중치 이용 조건 확인 필요 |
+| Basic Pitch (Spotify) | 피아노 외 악기 채보 | Apache 2.0 | 패키지에 포함된 ONNX 모델 사용 |
+| pretty_midi / mir_eval / resampy | Basic Pitch 의존성 | MIT / MIT / ISC | |
 | music21 | MIDI → 악보 변환 | BSD-3 | |
 | Verovio | 악보 조판(PDF) | LGPL v3 | Python 확장 모듈로 동적 사용 |
 | CairoSVG / pypdf | SVG → PDF | LGPL v3 / BSD-3 | |

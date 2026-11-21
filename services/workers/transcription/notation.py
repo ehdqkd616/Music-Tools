@@ -1,10 +1,11 @@
-"""Note events -> a two-staff piano score (MusicXML) and an engraved PDF.
+"""Note events -> a score (MusicXML) and an engraved PDF.
 
 The MIDI keeps the performance as played. The score is a readable
-approximation: notes are snapped to a 16th-note grid along the tracked beats,
-split between the hands at middle C, and simultaneous notes in one hand are
-merged into a single chord (notes held under a moving line are cut at the next
-onset). Triplets and time signatures other than 4/4 aren't detected.
+approximation: notes are snapped to a 16th-note grid along the tracked beats
+and simultaneous notes on one staff are merged into a single chord (notes held
+under a moving line are cut at the next onset). Piano gets two staves split at
+middle C, every other instrument one staff. Triplets and time signatures other
+than 4/4 aren't detected.
 """
 
 import io
@@ -50,8 +51,43 @@ def _quantize(x: np.ndarray) -> np.ndarray:
     return np.round(x * GRID) / GRID
 
 
-def build_score(events: list[dict], bpm: float, beats: np.ndarray, title: str | None):
-    from music21 import chord, clef, instrument, key, layout, metadata, meter, note, pitch, stream, tempo
+# instrument -> (part name, General MIDI program)
+PART_INFO = {
+    "piano": ("Piano", 0),
+    "guitar": ("Guitar", 25),
+    "bass": ("Bass", 33),
+    "vocals": ("Voice", 53),
+    "strings": ("Strings", 40),
+    "winds": ("Winds", 73),
+    "other": ("Instrument", 0),
+}
+
+
+WRITTEN_OCTAVE_UP = {"guitar", "bass"}
+
+
+def _staves(instrument_name: str, midi_notes: list[int]):
+    """[(staff id, clef, which notes go on it)] for the instrument."""
+    from music21 import clef
+
+    if instrument_name == "piano":
+        return [
+            ("rh", clef.TrebleClef(), lambda m: m >= SPLIT_PITCH),
+            ("lh", clef.BassClef(), lambda m: m < SPLIT_PITCH),
+        ]
+    everything = lambda m: True  # noqa: E731
+    if instrument_name == "guitar":
+        return [("main", clef.Treble8vbClef(), everything)]
+    if instrument_name == "bass":
+        return [("main", clef.BassClef(), everything)]
+    median = float(np.median(midi_notes))
+    if instrument_name == "vocals" and median < 60:
+        return [("main", clef.Treble8vbClef(), everything)]  # lower voices, as in choral scores
+    return [("main", clef.TrebleClef() if median >= 55 else clef.BassClef(), everything)]
+
+
+def build_score(events: list[dict], bpm: float, beats: np.ndarray, title: str | None, instrument_name: str = "piano"):
+    from music21 import chord, instrument, interval, key, layout, metadata, meter, note, pitch, stream, tempo
 
     onsets = _to_beats(np.array([e["onset_time"] for e in events], dtype=float), beats, bpm)
     offsets = _to_beats(np.array([e["offset_time"] for e in events], dtype=float), beats, bpm)
@@ -59,10 +95,12 @@ def build_score(events: list[dict], bpm: float, beats: np.ndarray, title: str | 
     q_on = _quantize(onsets - origin)
     q_off = np.maximum(_quantize(offsets - origin), q_on + 1 / GRID)
 
-    hands: dict[str, dict[float, dict[int, float]]] = {"rh": defaultdict(dict), "lh": defaultdict(dict)}
+    staves = _staves(instrument_name, [int(e["midi_note"]) for e in events])
+    groups_by_staff: dict[str, dict[float, dict[int, float]]] = {sid: defaultdict(dict) for sid, _, _ in staves}
     for e, on, off in zip(events, q_on, q_off):
         midi = int(e["midi_note"])
-        group = hands["rh" if midi >= SPLIT_PITCH else "lh"][float(on)]
+        sid = next(s for s, _, accepts in staves if accepts(midi))
+        group = groups_by_staff[sid][float(on)]
         group[midi] = max(group.get(midi, 0.0), float(off))
 
     # Key from the notes themselves (Krumhansl-Schmuckler), which beats audio chroma
@@ -79,19 +117,33 @@ def build_score(events: list[dict], bpm: float, beats: np.ndarray, title: str | 
             p = p.getEnharmonic()
         return p
 
+    part_name, midi_program = PART_INFO.get(instrument_name, PART_INFO["other"])
     score = stream.Score()
-    score.metadata = metadata.Metadata(title=title or "Piano")
+    # Notes go in at sounding pitch; parts written an octave up (octave clefs) get
+    # their written pitches and a MusicXML <transpose> from this on export.
+    score.atSoundingPitch = True
+    score.metadata = metadata.Metadata(title=title or part_name)
     staffs = []
-    for hand, staff_clef in (("rh", clef.TrebleClef()), ("lh", clef.BassClef())):
-        part = stream.PartStaff()
-        part.insert(0, instrument.Piano())
+    for index, (sid, staff_clef, _) in enumerate(staves):
+        part = stream.PartStaff() if len(staves) > 1 else stream.Part()
+        # A plain Instrument, not music21's Guitar/ElectricBass classes: those carry
+        # transpositions that would shift the exported pitches.
+        part_instrument = instrument.Piano() if instrument_name == "piano" else instrument.Instrument()
+        if instrument_name != "piano":
+            part_instrument.partName = part_name
+            part_instrument.instrumentName = part_name
+            part_instrument.midiProgram = midi_program
+            # Guitar, bass and low voices are written an octave above how they sound.
+            if instrument_name in WRITTEN_OCTAVE_UP or staff_clef.octaveChange == -1:
+                part_instrument.transposition = interval.Interval("P-8")
+        part.insert(0, part_instrument)
         part.insert(0, staff_clef)
         part.insert(0, key.KeySignature(detected_key.sharps))
         part.insert(0, meter.TimeSignature("4/4"))
-        if hand == "rh":
+        if index == 0:
             part.insert(0, tempo.MetronomeMark(number=round(bpm)))
 
-        groups = sorted(hands[hand].items())
+        groups = sorted(groups_by_staff[sid].items())
         if not groups:
             part.insert(0, note.Rest(quarterLength=4))
         for i, (on, pitches) in enumerate(groups):
@@ -106,7 +158,8 @@ def build_score(events: list[dict], bpm: float, beats: np.ndarray, title: str | 
         staffs.append(part)
         score.insert(0, part)
 
-    score.insert(0, layout.StaffGroup(staffs, symbol="brace", barTogether=True))
+    if len(staffs) > 1:
+        score.insert(0, layout.StaffGroup(staffs, symbol="brace", barTogether=True))
     return score.makeNotation(), detected_key
 
 

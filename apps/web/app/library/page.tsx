@@ -125,10 +125,16 @@ export default function LibraryPage() {
                 🎤 이어하기
               </button>
               <button
-                onClick={() => router.push(`/piano?media=${item.media_id}`)}
+                onClick={() => router.push(`/stems?media=${item.media_id}`)}
                 className="rounded-md border border-white/10 hover:border-white/30 px-3 py-1.5 text-xs whitespace-nowrap"
               >
-                🎹 채보
+                🎚 악기 분리
+              </button>
+              <button
+                onClick={() => router.push(`/transcribe?media=${item.media_id}`)}
+                className="rounded-md border border-white/10 hover:border-white/30 px-3 py-1.5 text-xs whitespace-nowrap"
+              >
+                🎼 채보
               </button>
               <button
                 onClick={() => handleDelete(item)}

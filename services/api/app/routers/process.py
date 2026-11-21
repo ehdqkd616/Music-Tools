@@ -6,6 +6,8 @@ from common.config import get_settings
 from common.db.models import Job, User
 from common.db.session import SessionLocal
 from common.media_registry import clone_media_for_user
+from common.stems import STEM_ORDER, cached_output_ids, separation_model
+from common.transcription import INSTRUMENTS, pipeline_version
 
 from ..deps import enforce_separate_quota, get_accessible_media, require_user
 from ..errors import ApiError
@@ -46,19 +48,19 @@ def _record_cache_hit(db, job_type: str, body, user: User, cached_ids: list[str]
 
 @router.post("/separate", response_model=JobCreatedResponse, dependencies=[Depends(enforce_separate_quota)])
 def process_separate(body: SeparateRequest, current_user: User = Depends(require_user)) -> JobCreatedResponse:
-    if body.stems != 2:
-        raise ApiError("VALIDATION_ERROR", "MVP는 2스템(보컬/반주) 분리만 지원합니다.", {"stems": body.stems})
+    if body.stems not in STEM_ORDER:
+        raise ApiError("VALIDATION_ERROR", "2, 4, 6개 분리만 지원합니다.", {"stems": body.stems})
 
     settings = get_settings()
     db = SessionLocal()
     try:
         media = get_accessible_media(db, body.media_id, current_user)
-        model_name = settings.demucs_fast_model if body.quality == "fast" else settings.demucs_hq_model
+        model_name = separation_model(settings, body.stems, body.quality)
 
         cached = cache_get(l2_key(media.content_hash, model_name, body.stems))
         if cached:
-            # 순서가 중요하다 — 스튜디오는 outputs[0]=보컬, [1]=반주로 읽는다.
-            cached_ids = [cached.get("vocals_media_id"), cached.get("instrumental_media_id")]
+            # 순서가 중요하다 — 화면은 outputs를 output_names(stems) 순서로 읽는다.
+            cached_ids = cached_output_ids(cached, body.stems)
             if all(cached_ids):
                 job = _record_cache_hit(db, "separate", body, current_user, cached_ids)
                 if job:
@@ -110,20 +112,19 @@ def process_split_vocals(body: SplitVocalsRequest, current_user: User = Depends(
     )
 
 
-# workers/tasks/transcribe.py의 PIPELINE_VERSION과 같아야 캐시가 맞는다.
-TRANSCRIBE_PIPELINE_VERSION = "piano-v1"
-
-
 @router.post("/transcribe", response_model=JobCreatedResponse, dependencies=[Depends(enforce_separate_quota)])
 def process_transcribe(body: TranscribeRequest, current_user: User = Depends(require_user)) -> JobCreatedResponse:
-    """피아노 독주 음원을 채보한다. outputs = [MIDI, MusicXML, PDF]."""
+    """독주 음원을 채보한다. outputs = [MIDI, MusicXML, PDF]."""
+    if body.instrument not in INSTRUMENTS:
+        raise ApiError("VALIDATION_ERROR", "지원하지 않는 악기입니다.", {"instrument": body.instrument})
+
     db = SessionLocal()
     try:
         media = get_accessible_media(db, body.media_id, current_user)
         if not media.mime_type.startswith("audio/"):
             raise ApiError("VALIDATION_ERROR", "오디오 파일만 채보할 수 있어요.", {"media_id": body.media_id})
 
-        cached = cache_get(transcribe_key(media.content_hash, TRANSCRIBE_PIPELINE_VERSION))
+        cached = cache_get(transcribe_key(media.content_hash, pipeline_version(body.instrument)))
         if cached:
             cached_ids = [cached.get("midi_media_id"), cached.get("musicxml_media_id"), cached.get("pdf_media_id")]
             if all(cached_ids):
@@ -131,8 +132,9 @@ def process_transcribe(body: TranscribeRequest, current_user: User = Depends(req
                 if job:
                     return JobCreatedResponse(job_id=job.id, status="succeeded", cached=True)
 
-        # CPU 추론이 곡 길이의 0.7배 안팎 + 악보 만들기 몇 초
-        eta = int(float(media.duration_sec or 180) * 0.7) + 20
+        # 피아노는 CPU 추론이 곡 길이의 0.7배 안팎, 다른 악기는 몇 초 + 악보 만들기 몇 초
+        duration = float(media.duration_sec or 180)
+        eta = int(duration * 0.7) + 20 if body.instrument == "piano" else int(duration * 0.1) + 15
         job = create_job(db, "transcribe", body.media_id, body.model_dump(), user_id=current_user.id)
     finally:
         db.close()

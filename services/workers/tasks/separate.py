@@ -5,14 +5,13 @@ from common.cache import L2_TTL, cache_get, cache_set, l2_key
 from common.config import get_settings
 from common.db.models import Media
 from common.db.session import session_scope
+from common.audio_convert import encode
+from common.stems import STEM_ORDER, cached_output_ids, has_previews, output_names, separation_model
 from common.storage import download_file, upload_file
 
 from ..celery_app import app
 from ..job_lifecycle import claim_cached_outputs, mark_failed, mark_progress, mark_running, mark_succeeded, register_media
 from ..separation.separator import load_model, save_stem, separate
-
-QUALITY_MODEL = {"fast": "demucs_fast_model", "high": "demucs_hq_model"}
-
 
 @app.task(name="tasks.separate_stems", bind=True, max_retries=1)
 def separate_stems(self, job_id: str) -> dict:
@@ -32,19 +31,17 @@ def separate_stems(self, job_id: str) -> dict:
 
     stems = int(params.get("stems", 2))
     quality = params.get("quality", "fast")
-    model_name = getattr(settings, QUALITY_MODEL.get(quality, "demucs_fast_model"))
+    model_name = separation_model(settings, stems, quality)
 
     mark_running(job_id)
 
     cache_key = l2_key(source_hash, model_name, stems)
     cached = cache_get(cache_key)
     if cached:
-        output_ids = claim_cached_outputs(
-            [cached.get("vocals_media_id"), cached.get("instrumental_media_id")], user_id, params["media_id"]
-        )
+        output_ids = claim_cached_outputs(cached_output_ids(cached, stems), user_id, params["media_id"])
         if output_ids:
             mark_succeeded(job_id, output_ids, cache_hit=True)
-            return {"vocals_media_id": output_ids[0], "instrumental_media_id": output_ids[1]}
+            return dict(zip([f"{name}_media_id" for name in output_names(stems)], output_ids))
 
     work_dir = tempfile.mkdtemp(prefix="sep_")
     try:
@@ -57,7 +54,8 @@ def separate_stems(self, job_id: str) -> dict:
         mark_progress(job_id, 80, "separating")
 
         output_ids: dict[str, str] = {}
-        for stem_name, tensor in result.items():
+        for stem_name in STEM_ORDER[stems]:
+            tensor = result[stem_name]
             local_out = os.path.join(work_dir, f"{stem_name}.wav")
             save_stem(tensor, local_out, sample_rate=model.samplerate)
 
@@ -79,14 +77,30 @@ def separate_stems(self, job_id: str) -> dict:
             )
             output_ids[stem_name] = media_id
 
-        cache_payload = {
-            "vocals_media_id": output_ids.get("vocals"),
-            "instrumental_media_id": output_ids.get("instrumental"),
-            **{f"{k}_media_id": v for k, v in output_ids.items() if k not in ("vocals", "instrumental")},
-        }
+            if has_previews(stems):
+                preview_out = os.path.join(work_dir, f"{stem_name}.mp3")
+                encode(local_out, preview_out, "mp3-192")
+                preview_key = f"separated/{source_hash}/{model_name}/{stem_name}.mp3"
+                upload_file(preview_out, preview_key, "audio/mpeg")
+                output_ids[f"{stem_name}_preview"] = register_media(
+                    kind="stem",
+                    source_type="derived",
+                    parent_id=params["media_id"],
+                    content_hash=f"{source_hash}:{model_name}:{stem_name}:mp3",
+                    storage_key=preview_key,
+                    mime_type="audio/mpeg",
+                    size_bytes=os.path.getsize(preview_out),
+                    title=source_title,
+                    artist=source_artist,
+                    lineage={"op": "separate", "model": model_name, "stem": stem_name, "stems": stems, "preview": True},
+                    user_id=user_id,
+                )
+
+        cache_payload = {f"{name}_media_id": output_ids[name] for name in output_names(stems)}
         cache_set(cache_key, cache_payload, L2_TTL)
 
-        mark_succeeded(job_id, list(output_ids.values()))
+        # 순서가 중요하다 — 화면은 outputs를 output_names(stems) 순서로 읽는다.
+        mark_succeeded(job_id, [output_ids[name] for name in output_names(stems)])
         return cache_payload
 
     except Exception as exc:

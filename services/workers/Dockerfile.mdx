@@ -10,6 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY services/workers/requirements-mdx.txt ./requirements-mdx.txt
 RUN pip install --no-cache-dir -r requirements-mdx.txt
+# Basic Pitch without its declared deps: on Linux it pulls in tensorflow<2.15.1,
+# which needs numpy<2. We run its bundled ONNX model with onnxruntime instead;
+# its remaining deps are in requirements-mdx.txt.
+RUN pip install --no-cache-dir --no-deps basic-pitch==0.4.0
 
 # Score PDFs: Verovio's SVG draws text symbols (e.g. the tempo note) with its
 # Leipzig font as an embedded web font, which cairo can't read, so install it

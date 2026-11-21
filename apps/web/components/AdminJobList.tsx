@@ -10,7 +10,7 @@ const TYPE_LABEL: Record<string, string> = {
   extract: "유튜브 가져오기",
   separate: "보컬 분리",
   split_vocals: "코러스 분리",
-  transcribe: "피아노 채보",
+  transcribe: "채보",
   pitch: "키 변경",
   tempo: "템포 변경",
   mix: "믹스/내보내기",
@@ -30,13 +30,17 @@ function describeParams(job: AdminJobItem): string | null {
     case "extract":
       return [p.kind === "video" ? "영상" : "오디오", p.format_id].filter(Boolean).join(" · ");
     case "separate":
-      return p.quality === "high" ? "고품질" : "빠르게";
+      return [p.stems && p.stems !== 2 ? `${p.stems}개 악기` : "보컬/MR", p.quality === "high" ? "고품질" : null]
+        .filter(Boolean)
+        .join(" · ");
     case "pitch": {
       const st = Number(p.semitones ?? 0);
       return `${st > 0 ? "+" : ""}${st}키${p.preview ? " (미리듣기)" : ""}`;
     }
     case "tempo":
       return p.ratio != null ? `×${p.ratio}` : null;
+    case "transcribe":
+      return typeof p.instrument === "string" ? p.instrument : "piano";
     case "mix":
       return typeof p.output_format === "string" ? p.output_format : null;
     default:

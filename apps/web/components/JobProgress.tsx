@@ -12,9 +12,9 @@ interface Props {
 
 const STAGE_LABEL: Record<string, string> = {
   downloading: "다운로드 중",
-  separating: "보컬/반주 분리 중",
+  separating: "분리 중",
   splitting_vocals: "리드/코러스 분리 중",
-  transcribing: "피아노 음 인식 중",
+  transcribing: "음 인식 중",
   engraving: "악보 만드는 중",
   pitch_shifting: "키 변경 중",
   time_stretching: "템포 조절 중",

@@ -11,8 +11,11 @@ export default function SiteHeader() {
         Studio
       </a>
       <nav className="text-sm text-white/60 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <a href="/piano" className="hover:text-white whitespace-nowrap">
-          피아노 채보
+        <a href="/stems" className="hover:text-white whitespace-nowrap">
+          악기별 분리
+        </a>
+        <a href="/transcribe" className="hover:text-white whitespace-nowrap">
+          채보
         </a>
         <a href="/library" className="hover:text-white whitespace-nowrap">
           내 작업

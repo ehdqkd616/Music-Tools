@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 
 class SeparateRequest(BaseModel):
     media_id: str
-    stems: int = 2  # MVP only supports 2 (§2.1); 4/6 are Phase 2
-    quality: str = "fast"  # "fast"=htdemucs | "high"=htdemucs_ft
+    stems: int = 2  # 2=보컬/반주, 4=보컬·드럼·베이스·나머지, 6=+기타·피아노 (common/stems.py)
+    quality: str = "fast"  # "fast"=htdemucs | "high"=htdemucs_ft (6스템은 항상 htdemucs_6s)
 
 
 class SplitVocalsRequest(BaseModel):
@@ -14,7 +14,8 @@ class SplitVocalsRequest(BaseModel):
 
 
 class TranscribeRequest(BaseModel):
-    media_id: str  # 피아노 독주 음원
+    media_id: str  # 독주 음원
+    instrument: str = "piano"  # common/transcription.py의 INSTRUMENTS
 
 
 class PitchRequest(BaseModel):

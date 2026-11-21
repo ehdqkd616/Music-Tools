@@ -38,6 +38,8 @@ STEM_LABEL_EN = {
     "other": "MR",
     "drums": "Drums",
     "bass": "Bass",
+    "guitar": "Guitar",
+    "piano": "Piano",
 }
 
 
@@ -67,9 +69,13 @@ def _download_filename(media: Media) -> str:
     parts = [base]
 
     if op == "separate":
-        parts.append(STEM_LABEL_EN.get(lineage.get("stem"), lineage.get("stem", "stem")))
+        stem = lineage.get("stem", "stem")
+        # 4/6스템의 "other"는 반주 전체(MR)가 아니라 나머지 악기다.
+        label = "Other" if stem == "other" and lineage.get("stems") in (4, 6) else STEM_LABEL_EN.get(stem, stem)
+        parts.append(label)
     elif op == "transcribe":
-        parts.append("Piano" if lineage.get("format") == "midi" else "Piano Score")
+        instrument = str(lineage.get("instrument", "piano")).capitalize()
+        parts.append(instrument if lineage.get("format") == "midi" else f"{instrument} Score")
     elif op == "pitch":
         key_tag = _key_tag(lineage.get("semitones"))
         if key_tag:

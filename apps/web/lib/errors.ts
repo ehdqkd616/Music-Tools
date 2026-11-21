@@ -13,7 +13,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   EXTRACTION_FAILED: "추출에 실패했습니다. 다른 영상으로 시도하거나 잠시 후 다시 시도해주세요.",
   SEPARATION_FAILED: "코러스 분리에 실패했습니다. 잠시 후 다시 시도해주세요.",
   TRANSCRIPTION_FAILED: "채보에 실패했습니다. 잠시 후 다시 시도해주세요.",
-  NO_NOTES_DETECTED: "피아노 소리를 찾지 못했어요. 피아노 독주 음원인지 확인해주세요.",
+  NO_NOTES_DETECTED: "악기 소리를 찾지 못했어요. 고른 악기로 연주한 음원인지 확인해주세요.",
   GPU_OOM: "처리 중 메모리 부족이 발생했습니다. 잠시 후 다시 시도해주세요.",
   USERNAME_TAKEN: "이미 사용 중인 아이디입니다.",
   INVALID_CREDENTIALS: "아이디 또는 비밀번호가 올바르지 않습니다.",

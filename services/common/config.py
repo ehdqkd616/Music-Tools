@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     demucs_device: str = "cpu"
     demucs_fast_model: str = "htdemucs"
     demucs_hq_model: str = "htdemucs_ft"
+    demucs_6s_model: str = "htdemucs_6s"  # 기타·피아노까지 나누는 6스템 모델
 
     # audio-separator 카라오케 모델 — Demucs 보컬 스템을 리드/코러스로 나눈다.
     karaoke_model: str = "UVR_MDXNET_KARA_2.onnx"

@@ -19,6 +19,12 @@ verovio==6.4.1
 cairosvg==2.9.1
 pypdf==7.1.1
 
+# Other-instrument transcription: Basic Pitch's runtime deps (the package itself
+# is installed with --no-deps in Dockerfile.mdx).
+mir-eval==0.8.2
+pretty-midi==0.2.11.post0
+resampy==0.4.2
+
 # Needed for `workers.tasks` to import (Celery task registration) and for the
 # task's own DB/storage work.
 pydantic==2.9.0
