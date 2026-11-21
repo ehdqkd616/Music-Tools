@@ -84,6 +84,12 @@ export const api = {
       body: JSON.stringify({ media_id }),
     }),
 
+  transcribe: (media_id: string) =>
+    request<JobCreatedResponse>("/api/v1/process/transcribe", {
+      method: "POST",
+      body: JSON.stringify({ media_id }),
+    }),
+
   pitch: (media_id: string, semitones: number, stem_type: string = "other", preview: boolean = false) =>
     request<JobCreatedResponse>("/api/v1/process/pitch", {
       method: "POST",

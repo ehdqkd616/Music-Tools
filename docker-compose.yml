@@ -89,12 +89,12 @@ services:
       - ./services/common:/srv/common
       - demucs-models:/root/.cache/torch
 
-  # Lead/backing vocal split — CPU-only and in its own image, because
-  # audio-separator's numpy/torch versions conflict with the other workers.
+  # Lead/backing vocal split and piano transcription — CPU-only and in its own
+  # image, because their numpy/torch versions conflict with the other workers.
   worker-mdx:
     build: { context: ., dockerfile: services/workers/Dockerfile.mdx }
     env_file: .env
-    command: celery -A workers.celery_app worker -Q mdx -c 1 -P solo --loglevel=INFO
+    command: celery -A workers.celery_app worker -Q mdx,transcribe -c 1 -P solo --loglevel=INFO
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }

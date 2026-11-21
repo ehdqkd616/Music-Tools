@@ -10,6 +10,7 @@ const TYPE_LABEL: Record<string, string> = {
   extract: "유튜브 가져오기",
   separate: "보컬 분리",
   split_vocals: "코러스 분리",
+  transcribe: "피아노 채보",
   pitch: "키 변경",
   tempo: "템포 변경",
   mix: "믹스/내보내기",

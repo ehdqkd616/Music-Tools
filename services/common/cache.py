@@ -46,6 +46,10 @@ def pitch_key(content_hash_: str, semitones: float, stem_type: str, preview: boo
     return f"pitch:{content_hash_}:{semitones}:{stem_type}:{tier}"
 
 
+def transcribe_key(content_hash_: str, pipeline_version: str) -> str:
+    return f"transcribe:{content_hash_}:{pipeline_version}"
+
+
 def tempo_key(content_hash_: str, ratio: float) -> str:
     return f"tempo:{content_hash_}:{ratio}"
 

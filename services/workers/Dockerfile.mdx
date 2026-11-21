@@ -1,15 +1,38 @@
-# Lead/backing vocal split — isolated CPU-only image (see requirements-mdx.txt
+# Lead/backing vocal split + piano transcription — isolated CPU-only image (see requirements-mdx.txt
 # for why it can't share worker-separate's environment).
 FROM python:3.11-slim
 
 WORKDIR /srv
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg libsndfile1 gcc g++ \
+    ffmpeg libsndfile1 gcc g++ libcairo2 fontconfig fonts-nanum \
     && rm -rf /var/lib/apt/lists/*
 
 COPY services/workers/requirements-mdx.txt ./requirements-mdx.txt
 RUN pip install --no-cache-dir -r requirements-mdx.txt
+
+# Score PDFs: Verovio's SVG draws text symbols (e.g. the tempo note) with its
+# Leipzig font as an embedded web font, which cairo can't read, so install it
+# as a system font from the copy Verovio ships.
+RUN python - <<'PY' && fc-cache -f
+import base64, os, re, verovio
+css = open(os.path.join(os.path.dirname(verovio.__file__), "data", "Leipzig.css")).read()
+os.makedirs("/usr/local/share/fonts/verovio", exist_ok=True)
+with open("/usr/local/share/fonts/verovio/Leipzig.woff2", "wb") as f:
+    f.write(base64.b64decode(re.search(r"base64,([^)]+)\)", css).group(1)))
+PY
+
+# Piano transcription checkpoint (~165MB). The package would otherwise fetch it
+# on first use with wget, which this image doesn't have.
+RUN python - <<'PY'
+import os, urllib.request
+path = "/opt/models/piano_transcription.pth"
+os.makedirs(os.path.dirname(path), exist_ok=True)
+urllib.request.urlretrieve(
+    "https://zenodo.org/record/4034264/files/CRNN_note_F1%3D0.9677_pedal_F1%3D0.9186.pth?download=1", path
+)
+assert os.path.getsize(path) > 1.6e8, "checkpoint download looks truncated"
+PY
 
 COPY services/common ./common
 # The whole tree, because workers/tasks/__init__.py imports every task module.

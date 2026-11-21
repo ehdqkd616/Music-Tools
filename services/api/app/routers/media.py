@@ -25,6 +25,9 @@ EXT_BY_MIME = {
     "audio/flac": "flac",
     "audio/x-flac": "flac",
     "video/mp4": "mp4",
+    "audio/midi": "mid",
+    "application/vnd.recordare.musicxml+xml": "musicxml",
+    "application/pdf": "pdf",
 }
 
 STEM_LABEL_EN = {
@@ -65,6 +68,8 @@ def _download_filename(media: Media) -> str:
 
     if op == "separate":
         parts.append(STEM_LABEL_EN.get(lineage.get("stem"), lineage.get("stem", "stem")))
+    elif op == "transcribe":
+        parts.append("Piano" if lineage.get("format") == "midi" else "Piano Score")
     elif op == "pitch":
         key_tag = _key_tag(lineage.get("semitones"))
         if key_tag:

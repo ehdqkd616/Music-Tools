@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from common.cache import cache_get, l2_key, pitch_key, tempo_key
+from common.cache import cache_get, l2_key, pitch_key, tempo_key, transcribe_key
 from common.celery_client import send_task
 from common.config import get_settings
 from common.db.models import Job, User
@@ -11,7 +11,14 @@ from ..deps import enforce_separate_quota, get_accessible_media, require_user
 from ..errors import ApiError
 from ..job_utils import ETA_SEC, create_job, queue_position
 from ..schemas.jobs import JobCreatedResponse
-from ..schemas.process import MixRequest, PitchRequest, SeparateRequest, SplitVocalsRequest, TempoRequest
+from ..schemas.process import (
+    MixRequest,
+    PitchRequest,
+    SeparateRequest,
+    SplitVocalsRequest,
+    TempoRequest,
+    TranscribeRequest,
+)
 
 router = APIRouter()
 
@@ -100,6 +107,39 @@ def process_split_vocals(body: SplitVocalsRequest, current_user: User = Depends(
         queue_position=queue_position("split_vocals"),
         eta_sec=ETA_SEC["split_vocals"],
         cached=False,
+    )
+
+
+# workers/tasks/transcribe.py의 PIPELINE_VERSION과 같아야 캐시가 맞는다.
+TRANSCRIBE_PIPELINE_VERSION = "piano-v1"
+
+
+@router.post("/transcribe", response_model=JobCreatedResponse, dependencies=[Depends(enforce_separate_quota)])
+def process_transcribe(body: TranscribeRequest, current_user: User = Depends(require_user)) -> JobCreatedResponse:
+    """피아노 독주 음원을 채보한다. outputs = [MIDI, MusicXML, PDF]."""
+    db = SessionLocal()
+    try:
+        media = get_accessible_media(db, body.media_id, current_user)
+        if not media.mime_type.startswith("audio/"):
+            raise ApiError("VALIDATION_ERROR", "오디오 파일만 채보할 수 있어요.", {"media_id": body.media_id})
+
+        cached = cache_get(transcribe_key(media.content_hash, TRANSCRIBE_PIPELINE_VERSION))
+        if cached:
+            cached_ids = [cached.get("midi_media_id"), cached.get("musicxml_media_id"), cached.get("pdf_media_id")]
+            if all(cached_ids):
+                job = _record_cache_hit(db, "transcribe", body, current_user, cached_ids)
+                if job:
+                    return JobCreatedResponse(job_id=job.id, status="succeeded", cached=True)
+
+        # CPU 추론이 곡 길이의 0.7배 안팎 + 악보 만들기 몇 초
+        eta = int(float(media.duration_sec or 180) * 0.7) + 20
+        job = create_job(db, "transcribe", body.media_id, body.model_dump(), user_id=current_user.id)
+    finally:
+        db.close()
+
+    send_task("tasks.transcribe_piano", args=[job.id], queue="transcribe")
+    return JobCreatedResponse(
+        job_id=job.id, status="queued", queue_position=queue_position("transcribe"), eta_sec=eta, cached=False
     )
 
 

@@ -1,4 +1,4 @@
-# Lead/backing vocal split (audio-separator) — a self-contained requirements
+# Lead/backing vocal split and piano transcription — a self-contained requirements
 # file, NOT layered on requirements.txt: audio-separator needs numpy>=2 and a
 # much newer torch, which conflict with that file's numpy==1.26.4 and
 # worker-separate's torch==2.4.1.
@@ -10,6 +10,14 @@
 torch==2.14.0+cpu
 audio-separator==0.47.0
 onnxruntime==1.30.0
+
+# Piano transcription (MIDI) and engraving (MusicXML -> PDF).
+piano_transcription_inference==0.0.6
+torchlibrosa==0.1.0
+music21==10.5.2
+verovio==6.4.1
+cairosvg==2.9.1
+pypdf==7.1.1
 
 # Needed for `workers.tasks` to import (Celery task registration) and for the
 # task's own DB/storage work.

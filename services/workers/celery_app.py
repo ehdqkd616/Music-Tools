@@ -21,12 +21,14 @@ app.conf.task_queues = (
     Queue("dsp", routing_key="dsp.#"),
     Queue("separate_priority", routing_key="separate.pro.#"),
     Queue("mdx", routing_key="mdx.#"),
+    Queue("transcribe", routing_key="transcribe.#"),
 )
 
 app.conf.task_routes = {
     "tasks.extract_youtube": {"queue": "download"},
     "tasks.separate_stems": {"queue": "separate"},
     "tasks.split_vocals": {"queue": "mdx"},
+    "tasks.transcribe_piano": {"queue": "transcribe"},
     "tasks.pitch_shift_stems": {"queue": "dsp"},
     "tasks.time_stretch_stems": {"queue": "dsp"},
     "tasks.mix_stems": {"queue": "dsp"},

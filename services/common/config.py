@@ -34,6 +34,8 @@ class Settings(BaseSettings):
 
     # audio-separator 카라오케 모델 — Demucs 보컬 스템을 리드/코러스로 나눈다.
     karaoke_model: str = "UVR_MDXNET_KARA_2.onnx"
+    # 피아노 채보 모델 체크포인트 — worker-mdx 이미지 빌드 때 받아둔다.
+    piano_checkpoint: str = "/opt/models/piano_transcription.pth"
 
     # Password of the shared "admin" account, synced on every API startup.
     admin_password: str = ""
